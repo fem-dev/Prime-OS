@@ -24,8 +24,16 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not download the Prime-OS repository.' }
 
     New-Item -ItemType Directory -Force -Path $appDir | Out-Null
+    $manifest = Get-FileHash (Join-Path $temp 'repo/loader.py') -Algorithm SHA256
+    if ($manifest.Hash -ne '171923E0A4B92CC799E6D865BE64B8C438337B5C05731101A512ACAE52A43A2D') {
+        throw 'loader.py SHA-256 verification failed. The download was not installed.'
+    }
     Copy-Item (Join-Path $temp 'repo/loader.py') $appDir -Force
     Copy-Item (Join-Path $temp 'repo/faravahar.png') $appDir -Force
+    $artHash = (Get-FileHash (Join-Path $temp 'repo/you.py') -Algorithm SHA256).Hash
+    if ($artHash -ne '3C2E7A85E8AAF1FE5BB3B944E8EFB87E57A0E8B9E5CA39F64F22C5E175339676') {
+        throw 'you.py SHA-256 verification failed. The download was not installed.'
+    }
     Copy-Item (Join-Path $temp 'repo/you.py') $appDir -Force
     Copy-Item (Join-Path $temp 'repo/requirements.txt') $appDir -Force
 

@@ -7,7 +7,10 @@ It never repartitions, flashes, or installs an operating system on the host.
 """
 from __future__ import annotations
 
+import ast
 import ctypes
+import hashlib
+import io
 import json
 import os
 import platform
@@ -31,6 +34,11 @@ REPO = "fem-dev/Prime-OS"
 API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 RAW_LOGO_URL = f"https://raw.githubusercontent.com/{REPO}/main/faravahar.png"
 RAW_ART_URL = f"https://raw.githubusercontent.com/{REPO}/main/you.py"
+ART_SHA256 = "3c2e7a85e8aaf1fe5bb3b944e8efb87e57a0e8b9e5ca39f64f22c5e175339676"
+LOGO_SHA256 = "7a2650c3a71e26e70def9e841bb3105756b246c9fbce64de719f0b1642fd472e"
+MAX_ART_BYTES = 2 * 1024 * 1024
+MAX_LOGO_BYTES = 2 * 1024 * 1024
+MAX_LOGO_PIXELS = 20_000_000
 if os.name == "nt":
     APP_DIR = Path(os.environ.get("PRIME_OS_HOME", Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Prime-OS"))
     CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / "Prime-OS"
@@ -148,7 +156,7 @@ class PrimeSetup:
         threading.Thread(target=self._load_art_module, daemon=True).start()
 
     def _load_art_module(self) -> None:
-        """Fetch and validate the supplied drawing module without executing it."""
+        """Fetch and validate the pinned drawing module without executing it."""
         target = APP_DIR / "you.py"
         try:
             source = Path(__file__).resolve().parent / "you.py"
@@ -158,16 +166,19 @@ class PrimeSetup:
                 APP_DIR.mkdir(parents=True, exist_ok=True)
                 request = urllib.request.Request(RAW_ART_URL, headers={"User-Agent": "Prime-OS-Setup"})
                 with urllib.request.urlopen(request, timeout=20) as response:
-                    content = response.read(2 * 1024 * 1024 + 1)
-                if len(content) > 2 * 1024 * 1024:
+                    content = response.read(MAX_ART_BYTES + 1)
+                if len(content) > MAX_ART_BYTES:
                     raise ValueError("you.py exceeds the 2 MiB safety limit")
                 source = target
                 source.write_bytes(content)
             content = source.read_bytes()
-            if len(content) > 2 * 1024 * 1024:
+            if len(content) > MAX_ART_BYTES:
                 raise ValueError("you.py exceeds the 2 MiB safety limit")
-            compile(content, str(source), "exec")
-            self.root.after(0, lambda: self.logo_hint.configure(text="Faravahar artwork module loaded · ready"))
+            if hashlib.sha256(content).hexdigest() != ART_SHA256:
+                raise ValueError("you.py SHA-256 verification failed")
+            ast.parse(content, filename=str(source), mode="exec")
+            self.root.after(0, lambda: self.logo_hint.configure(
+                text="Faravahar module verified · parsed only, never executed"))
         except Exception as exc:
             self.root.after(0, lambda error=str(exc): self.logo_hint.configure(
                 text=f"Could not load you.py: {error}"))
@@ -177,7 +188,17 @@ class PrimeSetup:
                       APP_DIR / "faravahar.png"]
         for path in candidates:
             try:
-                self.logo_source = Image.open(path).convert("RGBA")
+                raw = path.read_bytes()
+                if len(raw) > MAX_LOGO_BYTES:
+                    continue
+                if hashlib.sha256(raw).hexdigest() != LOGO_SHA256:
+                    continue
+                with Image.open(io.BytesIO(raw)) as source:
+                    if source.width * source.height > MAX_LOGO_PIXELS:
+                        continue
+                    source.verify()
+                with Image.open(io.BytesIO(raw)) as source:
+                    self.logo_source = source.convert("RGBA")
                 break
             except (OSError, ValueError):
                 continue
@@ -192,7 +213,17 @@ class PrimeSetup:
         try:
             request = urllib.request.Request(RAW_LOGO_URL, headers={"User-Agent": "Prime-OS-Setup"})
             with urllib.request.urlopen(request, timeout=20) as response:
-                image = Image.open(response).convert("RGBA")
+                raw = response.read(MAX_LOGO_BYTES + 1)
+            if len(raw) > MAX_LOGO_BYTES:
+                raise ValueError("Faravahar image exceeds the 2 MiB safety limit")
+            if hashlib.sha256(raw).hexdigest() != LOGO_SHA256:
+                raise ValueError("Faravahar image SHA-256 verification failed")
+            with Image.open(io.BytesIO(raw)) as source:
+                if source.width * source.height > MAX_LOGO_PIXELS:
+                    raise ValueError("Faravahar image exceeds the pixel limit")
+                source.verify()
+            with Image.open(io.BytesIO(raw)) as source:
+                image = source.convert("RGBA")
             self.root.after(0, lambda: self._set_downloaded_logo(image))
         except Exception as exc:
             self.root.after(0, lambda error=str(exc): self.status.set(f"Could not download the logo: {error}"))
@@ -265,7 +296,13 @@ class PrimeSetup:
         assert destination is not None
         temporary = destination.with_suffix(destination.suffix + ".part")
         try:
-            request = urllib.request.Request(asset["browser_download_url"], headers={
+            from urllib.parse import urlparse
+            download_url = asset.get("browser_download_url", "")
+            parsed_url = urlparse(download_url)
+            if (parsed_url.scheme != "https" or parsed_url.hostname != "github.com"
+                    or not parsed_url.path.startswith(f"/{REPO}/releases/download/")):
+                raise ValueError("GitHub release asset URL is not an allowed Prime-OS HTTPS URL")
+            request = urllib.request.Request(download_url, headers={
                 "User-Agent": "Prime-OS-Setup", "Accept": "application/octet-stream",
             })
             with urllib.request.urlopen(request, timeout=30) as response:
@@ -360,9 +397,13 @@ class PrimeSetup:
             "iso_downloaded": str(self.download_path) if self.download_finished else None,
             "mode": "preview-only; hardware allocation and OS installation are not implemented",
         }
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if os.name != "nt":
+            os.chmod(CONFIG_DIR, 0o700)
         config_path = CONFIG_DIR / "setup.json"
         config_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+        if os.name != "nt":
+            os.chmod(config_path, 0o600)
         for child in self.root.winfo_children():
             child.destroy()
         wrapper = tk.Frame(self.root, bg=BG, padx=40, pady=40)

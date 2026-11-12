@@ -17,9 +17,20 @@ git clone --depth 1 "${REPO_URL}" "${TMP_DIR}/repo" \
     || fail "Could not clone ${REPO_URL}. Check your internet connection."
 
 mkdir -p "${APP_DIR}"
+printf '%s  %s\n' \
+    "171923e0a4b92cc799e6d865be64b8c438337b5c05731101a512acae52a43a2d" \
+    "${TMP_DIR}/repo/loader.py" | sha256sum --check --status \
+    || fail "loader.py SHA-256 verification failed. The download was not installed."
+printf '%s  %s\n' \
+    "3c2e7a85e8aaf1fe5bb3b944e8efb87e57a0e8b9e5ca39f64f22c5e175339676" \
+    "${TMP_DIR}/repo/you.py" | sha256sum --check --status \
+    || fail "you.py SHA-256 verification failed. The download was not installed."
 install -m 0644 "${TMP_DIR}/repo/loader.py" "${APP_DIR}/loader.py"
+printf '%s  %s\n' \
+    "7a2650c3a71e26e70def9e841bb3105756b246c9fbce64de719f0b1642fd472e" \
+    "${TMP_DIR}/repo/faravahar.png" | sha256sum --check --status \
+    || fail "Faravahar image SHA-256 verification failed. The download was not installed."
 install -m 0644 "${TMP_DIR}/repo/faravahar.png" "${APP_DIR}/faravahar.png"
-install -m 0644 "${TMP_DIR}/repo/you.py" "${APP_DIR}/you.py"
 install -m 0644 "${TMP_DIR}/repo/you.py" "${APP_DIR}/you.py"
 install -m 0644 "${TMP_DIR}/repo/requirements.txt" "${APP_DIR}/requirements.txt"
 
