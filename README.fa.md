@@ -25,23 +25,22 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 
 این کار ویزارد نمایشی را در ویندوز اجرا می‌کند؛ ویندوز را پاک یا جایگزین نمی‌کند. اطلاعات برنامه در `%LOCALAPPDATA%\\Prime-OS` و ترجیحات در `%APPDATA%\\Prime-OS` ذخیره می‌شود.
 
-## ساخت در لینوکس
+## ساخت ISO
 
-سازنده به **Arch Linux** و بستهٔ `archiso` نیاز دارد. برای شروع، Arch را در ماشین مجازی نصب کن و سپس اجرا کن:
+سازنده Arch Linux را درون یک کانتینر جداگانهٔ Docker اجرا می‌کند؛ لازم نیست Linux را روی ویندوز نصب کنی. Docker باید نصب و در حال اجرا باشد. ساخت به اینترنت و چند گیگابایت فضای خالی نیاز دارد.
 
 ```bash
 git clone https://github.com/fem-dev/Prime-OS.git
 cd Prime-OS
-sudo pacman -Syu --needed archiso
-git submodule update --init --recursive
-sudo ./build.sh
+docker run --rm --privileged \
+  -e PRIME_OS_BUILD_CONTAINER=1 \
+  -v "$PWD:/work" \
+  -w /work \
+  archlinux:latest \
+  bash -lc 'pacman -Syu --noconfirm archiso && PRIME_OS_BUILD_CONTAINER=1 bash ./build.sh'
 ```
 
-ساخت اول به اینترنت نیاز دارد و بسته‌های زیادی دانلود می‌کند. فایل خروجی `out/os.iso` خواهد بود.
-
-### ویندوز
-
-ساخت مستقیم ISO بوت‌پذیر Arch در ویندوز انجام نمی‌شود. باید **WSL2 و Arch Linux داخل WSL** داشته باشی؛ برای اطمینان بیشتر پروژه را داخل home همان Arch کلون کن و دستورهای بالا را اجرا کن. اگر WSL نصب نیست یا توزیع آن Arch نیست، `build.ps1` خطای راهنما می‌دهد.
+اگر ساخت موفق شود، فایل `out/os.iso` ساخته می‌شود. فعلاً ISO ازپیش‌ساخته‌ای در GitHub منتشر نشده است. `build.sh` را با sudo روی سیستم اصلی اجرا نکن.
 
 ## اجرای آزمایشی
 

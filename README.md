@@ -17,18 +17,22 @@ The setup launcher supports Windows, Linux and macOS. Windows uses the native Se
 
 This image is for preview and testing. It does **not** currently install Prime-OS onto a disk. Secure Boot, an install wizard, hardware-specific performance tuning and automated hardware testing are not implemented yet. The package list contains common graphics drivers, but one ISO cannot include every proprietary GPU driver; NVIDIA open-kernel-module support also depends on the graphics card model.
 
-## Fast start on Linux
+## Build the ISO
 
-The image builder currently requires a native Arch Linux build environment with `archiso` installed. A recommended beginner path is to install Arch Linux in a virtual machine first.
+The builder uses Docker to run Arch Linux in an isolated container; it does not require installing Linux on the host. Docker must be installed and running, and the build needs an internet connection and several gigabytes of free space.
 
 ```bash
 git clone https://github.com/fem-dev/Prime-OS.git
 cd Prime-OS
-sudo pacman -Syu --needed archiso
-sudo ./build.sh
+docker run --rm --privileged \
+  -e PRIME_OS_BUILD_CONTAINER=1 \
+  -v "$PWD:/work" \
+  -w /work \
+  archlinux:latest \
+  bash -lc 'pacman -Syu --noconfirm archiso && PRIME_OS_BUILD_CONTAINER=1 bash ./build.sh'
 ```
 
-The finished image is `out/os.iso`. The first build needs an internet connection and downloads many Arch packages. A few gigabytes of free disk space may be needed in addition to the working directory.
+On success, the image is created at `out/os.iso`. The project does not currently publish a prebuilt ISO. Do not run `build.sh` with `sudo` directly on the host.
 
 ### Build and run on Windows
 
