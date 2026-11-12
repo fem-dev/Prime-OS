@@ -1,474 +1,370 @@
-# -*- coding: utf-8 -*-
-"""
-Faravahar DOWNLOAD BAR.
-The real Faravahar artwork (traced from your image) is the progress bar:
-every percent draws ONE more line (one at a time) and colours it.
-At 100% it shines and the word COMPLETE appears. Then it loops.
+#!/usr/bin/env python3
+"""Prime-OS GitHub image loader and first-run hardware preference wizard.
 
-    python loader.py faravahar.png
-    python loader.py faravahar.png --download https://example.com/system.iso --output system.iso
-    python loader.py faravahar.png --preview
-    add --invert if the logo is light-on-dark and tracing looks wrong
-
-With --download, progress is based on bytes actually received (the server must
-send Content-Length); the ISO is written to a temporary file and renamed only
-when the complete download has been verified.
+This downloads a published Prime-OS ISO release (when one exists), colours the
+Faravahar in sync with bytes received, and saves requested resource preferences.
+It never repartitions, flashes, or installs an operating system on the host.
 """
-import sys
+from __future__ import annotations
+
+import ctypes
+import json
+import os
+import platform
 import subprocess
-import importlib.util
+import sys
+import threading
+import urllib.error
+import urllib.request
+from pathlib import Path
+import tkinter as tk
+from tkinter import messagebox, ttk
 
-MIRROR = "https://liara.ir/mirrors/pypi/"        # <- exact index URL of the mirror
-NEEDED = {"numpy": "numpy", "matplotlib": "matplotlib", "PIL": "pillow",
-          "contourpy": "contourpy"}
+try:
+    from PIL import Image, ImageChops, ImageOps, ImageTk
+except ImportError as exc:
+    raise SystemExit(
+        "Prime-OS needs Pillow. Run the install command from README.md to install it."
+    ) from exc
 
-
-def install_deps():
-    missing = [p for m, p in NEEDED.items() if importlib.util.find_spec(m) is None]
-    if not missing:
-        return
-    base = MIRROR.rstrip("/")
-    for index in (base + "/simple/", base + "/", None):
-        cmd = [sys.executable, "-m", "pip", "install", "--upgrade", *missing]
-        if index:
-            cmd += ["--index-url", index]
-        print("[..]", " ".join(cmd))
-        if subprocess.call(cmd) == 0:
-            return
-    sys.exit("Could not install: " + ", ".join(missing))
-
-
-install_deps()
-
-import time                                                      # noqa: E402
-import io                                                        # noqa: E402
-import os                                                        # noqa: E402
-import threading                                                 # noqa: E402
-import urllib.request                                            # noqa: E402
-import logging                                                   # noqa: E402
-logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
-import numpy as np                                               # noqa: E402
-import matplotlib                                                # noqa: E402
-if "--preview" in sys.argv:
-    matplotlib.use("Agg")
-import matplotlib.pyplot as plt                                  # noqa: E402
-from matplotlib.animation import FuncAnimation, PillowWriter     # noqa: E402
-from matplotlib.patches import Rectangle                         # noqa: E402
-from matplotlib.path import Path                                 # noqa: E402
-from PIL import Image, ImageFilter                               # noqa: E402
-from contourpy import contour_generator, FillType                # noqa: E402
-
-BG = "#07070d"
-NG = 12                       # number of drawing layers
-MAX_SIDE = 900                # working resolution of the image
-MIN_AREA = 25                 # ignore specks smaller than this (pixels^2)
-BANDS = int(sys.argv[sys.argv.index("--bands") + 1]) if "--bands" in sys.argv else 1
-RING_PTS = 160                # max vertices per traced ring
+REPO = "fem-dev/Prime-OS"
+API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
+RAW_LOGO_URL = f"https://raw.githubusercontent.com/{REPO}/main/faravahar.png"
+APP_DIR = Path(os.environ.get("PRIME_OS_HOME", Path.home() / ".local" / "share" / "prime-os"))
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "prime-os"
+BG = "#090d18"
+PANEL = "#121a2a"
+ACCENT = "#a78bfa"
+GOLD = "#f2bb54"
+TEXT = "#f4f5fb"
+MUTED = "#a0abc0"
 
 
-# ----------------------------------------------------------------------
-# image -> shapes
-# ----------------------------------------------------------------------
-def load_image(src):
-    if src.startswith("http"):
-        req = urllib.request.Request(src, headers={"User-Agent": "Mozilla/5.0"})
-        data = urllib.request.urlopen(req, timeout=30).read()
-        return Image.open(io.BytesIO(data)).convert("RGBA")
-    return Image.open(src).convert("RGBA")
+def total_memory_gb() -> int:
+    try:
+        if os.name == "nt":
+            class MemoryStatus(ctypes.Structure):
+                _fields_ = [("length", ctypes.c_ulong), ("memoryLoad", ctypes.c_ulong),
+                            ("totalPhys", ctypes.c_ulonglong), ("availPhys", ctypes.c_ulonglong),
+                            ("totalPageFile", ctypes.c_ulonglong), ("availPageFile", ctypes.c_ulonglong),
+                            ("totalVirtual", ctypes.c_ulonglong), ("availVirtual", ctypes.c_ulonglong),
+                            ("availExtendedVirtual", ctypes.c_ulonglong)]
+            status = MemoryStatus()
+            status.length = ctypes.sizeof(status)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                return max(1, status.totalPhys // (1024**3))
+        pages = os.sysconf("SC_PHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        return max(1, pages * page_size // (1024**3))
+    except (AttributeError, OSError, ValueError):
+        return 8
 
 
-def make_mask(img, invert=False):
-    s = MAX_SIDE / max(img.size)
-    img = img.resize((max(1, int(img.width * s)), max(1, int(img.height * s))), Image.LANCZOS)
-    arr = np.asarray(img).astype(float)
-    rgb, alpha = arr[..., :3], arr[..., 3]
-    lineart = False
-    if alpha.min() < 200:                                   # transparent PNG
-        m = alpha / 255.0
-    else:                                                   # opaque: separate from background
-        border = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
-        bg = np.median(border, axis=0)
-        dist = np.linalg.norm(rgb - bg, axis=2)
-        lineart = bg.mean() > 180                            # dark ink on light paper
-        m = (dist > max(30, 0.35 * dist.max())).astype(float)
-    if invert:
-        m = 1 - m
-    m = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(
-        ImageFilter.GaussianBlur(1.1))) / 255.0
-    ys, xs = np.where(m > 0.5)
-    pad = 6
-    y0, y1 = max(0, ys.min() - pad), min(m.shape[0], ys.max() + pad)
-    x0, x1 = max(0, xs.min() - pad), min(m.shape[1], xs.max() + pad)
-    return rgb[y0:y1, x0:x1], m[y0:y1, x0:x1], lineart
+def gpu_name() -> str:
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=3, check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.splitlines()[0].strip()
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        pass
+    return "GPU not detected automatically"
 
 
-def resample_ring(P, n=None):
-    d = np.r_[0, np.cumsum(np.hypot(*np.diff(P, axis=0).T))]
-    n = int(np.clip(d[-1] / 2.2, 20, 700))               # point count follows the length
-    if len(P) <= n:
-        return P
-    t = np.linspace(0, d[-1], n)
-    return np.c_[np.interp(t, d, P[:, 0]), np.interp(t, d, P[:, 1])]
+class PrimeSetup:
+    def __init__(self, root: tk.Tk) -> None:
+        self.root = root
+        self.root.title("Prime-OS · Setup")
+        self.root.configure(bg=BG)
+        self.root.geometry("760x700")
+        self.root.minsize(620, 620)
+        self.root.option_add("*Font", ("Segoe UI", 10))
 
+        self.max_ram = total_memory_gb()
+        self.ram_choice = tk.IntVar(value=max(1, min(4, self.max_ram - 1)))
+        self.gpu_choice = tk.IntVar(value=50)
+        self.progress_value = tk.DoubleVar(value=0)
+        self.status = tk.StringVar(value="Connecting to the Prime-OS GitHub releases…")
+        self.release_result: dict | None = None
+        self.logo_source: Image.Image | None = None
+        self.logo_photo = None
+        self.download_path: Path | None = None
+        self.download_finished = False
 
-def poly_area(P):
-    return 0.5 * abs(np.dot(P[:, 0], np.roll(P[:, 1], 1)) - np.dot(P[:, 1], np.roll(P[:, 0], 1)))
+        self._style()
+        self._build_loader()
+        threading.Thread(target=self._check_release_worker, daemon=True).start()
 
+    def _style(self) -> None:
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+        style.configure("TScale", background=PANEL, troughcolor="#273149")
+        style.configure("Prime.Horizontal.TProgressbar", troughcolor="#202a3d",
+                        background=GOLD, bordercolor="#202a3d", lightcolor=GOLD,
+                        darkcolor=GOLD, thickness=9)
 
-def trace(rgb, mask, lineart=False):
-    h, w = mask.shape
-    pts_list, off_list, kinds = [], [], []
-    if BANDS <= 1:
-        gen = contour_generator(z=mask, fill_type=FillType.OuterOffset)
-        pts_list, off_list = gen.filled(0.5, 2.0)
-        kinds = ["ink"] * len(pts_list)
-        if lineart:                         # also the enclosed white areas (feather panels etc.)
-            gen2 = contour_generator(z=1 - mask, fill_type=FillType.OuterOffset)
-            a, b = gen2.filled(0.5, 2.0)
-            for pts, off in zip(a, b):
-                o = pts[off[0]:off[1]]
-                if (o[:, 0].max() - o[:, 0].min()) >= w - 4 and (o[:, 1].max() - o[:, 1].min()) >= h - 4:
-                    continue                # the outer paper background
-                pts_list.append(pts)
-                off_list.append(off)
-                kinds.append("fill")
-    else:                                   # split the logo into tonal bands (keeps inner detail)
-        lum = np.asarray(Image.fromarray(rgb.mean(axis=2).astype(np.uint8)).filter(
-            ImageFilter.GaussianBlur(1.0))).astype(float)
-        inside_vals = lum[mask > 0.5]
-        edges = np.percentile(inside_vals, np.linspace(0, 100, BANDS + 1))
-        edges[0], edges[-1] = -1, 256
-        z = np.where(mask > 0.5, lum, -50.0)
-        gen = contour_generator(z=z, fill_type=FillType.OuterOffset)
-        for lo, hi in zip(edges[:-1], edges[1:]):
-            a, b = gen.filled(lo, hi)
-            pts_list += list(a)
-            off_list += list(b)
-            kinds += ["ink"] * len(a)
+    def _build_loader(self) -> None:
+        wrapper = tk.Frame(self.root, bg=BG, padx=34, pady=24)
+        wrapper.pack(fill="both", expand=True)
+        tk.Label(wrapper, text="PRIME-OS", fg=TEXT, bg=BG,
+                 font=("Segoe UI", 25, "bold")).pack(pady=(8, 2))
+        tk.Label(wrapper, text="GAMING SYSTEM · EARLY PREVIEW", fg=ACCENT, bg=BG,
+                 font=("Segoe UI", 9, "bold")).pack(pady=(0, 12))
 
-    sat = (rgb.max(axis=2) - rgb.min(axis=2))[mask > 0.5]
-    coloured = sat.size > 0 and np.median(sat) > 25          # does the image have real colour?
+        self.logo_label = tk.Label(wrapper, bg=BG)
+        self.logo_label.pack(pady=4)
+        self.logo_hint = tk.Label(wrapper, text="", fg=MUTED, bg=BG,
+                                  font=("Segoe UI", 9))
+        self.logo_hint.pack(pady=(0, 8))
 
-    scale = min(11.6 / w, 6.4 / h)
-    shapes = []
-    for pts, off, kind in zip(pts_list, off_list, kinds):
-        rings = [pts[off[j]:off[j + 1]] for j in range(len(off) - 1)]
-        if poly_area(rings[0]) < MIN_AREA:
-            continue
-        outer = rings[0]
-        # colour: sample the image inside the outer ring
-        x0, x1 = int(outer[:, 0].min()), int(outer[:, 0].max()) + 1
-        y0, y1 = int(outer[:, 1].min()), int(outer[:, 1].max()) + 1
-        gx, gy = np.meshgrid(np.linspace(x0, x1, 14), np.linspace(y0, y1, 14))
-        g = np.c_[gx.ravel(), gy.ravel()]
-        inside = Path(outer).contains_points(g)
-        if inside.any():
-            sel = g[inside].astype(int)
-            sel[:, 0] = np.clip(sel[:, 0], 0, w - 1)
-            sel[:, 1] = np.clip(sel[:, 1], 0, h - 1)
-            col = rgb[sel[:, 1], sel[:, 0]].mean(axis=0) / 255.0
+        self.progress = ttk.Progressbar(wrapper, style="Prime.Horizontal.TProgressbar",
+                                        mode="determinate", maximum=100,
+                                        variable=self.progress_value)
+        self.progress.pack(fill="x", padx=26, pady=(10, 6))
+        tk.Label(wrapper, textvariable=self.status, fg=TEXT, bg=BG,
+                 wraplength=620, justify="center").pack(pady=(4, 12))
+
+        self.continue_button = tk.Button(
+            wrapper, text="Continue to setup", command=self._build_preferences,
+            bg="#6845c5", fg="white", activebackground="#8060df", activeforeground="white",
+            disabledforeground="#748099", relief="flat", padx=22, pady=10, state="disabled",
+        )
+        self.continue_button.pack(pady=8)
+        tk.Label(wrapper,
+                 text="Preview only: this app never flashes a USB, changes partitions, or installs over your OS.",
+                 fg=MUTED, bg=BG, wraplength=620, justify="center",
+                 font=("Segoe UI", 9)).pack(side="bottom", pady=(12, 0))
+        self._load_logo()
+
+    def _load_logo(self) -> None:
+        candidates = [Path(__file__).resolve().parent / "faravahar.png",
+                      APP_DIR / "faravahar.png"]
+        for path in candidates:
+            try:
+                self.logo_source = Image.open(path).convert("RGBA")
+                break
+            except (OSError, ValueError):
+                continue
+        if self.logo_source is None:
+            self.logo_hint.configure(text="Loading Faravahar artwork from GitHub…")
+            self.status.set("Faravahar artwork is missing; downloading it from GitHub…")
+            threading.Thread(target=self._download_logo_worker, daemon=True).start()
         else:
-            col = np.array([0.95, 0.76, 0.3])
-        cy = outer[:, 1].mean()
-        if lineart:
-            col = np.array([0.17, 0.09, 0.04])                # ink strokes: deep bronze
-        if lineart and kind == "fill":                        # paper areas become gold
-            u = cy / h
-            col = np.array([0.98, 0.80, 0.32]) * (1 - u) + np.array([0.80, 0.45, 0.12]) * u
-        elif not coloured and not lineart:                    # gold palette by height
-            u = cy / h                                        # 0 = top, 1 = bottom
-            col = np.array([0.96, 0.78, 0.30]) * (1 - u) + np.array([0.72, 0.38, 0.11]) * u
-        fixed = []
-        for r in rings:
-            r = resample_ring(r, RING_PTS)
-            r = np.c_[(r[:, 0] - w / 2) * scale, -(r[:, 1] - h / 2) * scale]   # centre + flip y
-            fixed.append(r)
-        shapes.append(dict(rings=fixed, rgb=np.clip(col, 0, 1), kind=kind, cy=-(cy - h / 2) * scale,
-                           area=poly_area(outer)))
-    # drawing order: bottom of the logo first, then upwards
-    shapes.sort(key=lambda s: s["cy"])
-    n = len(shapes)
-    for i, s in enumerate(shapes):
-        s["g"] = min(NG - 1, i * NG // max(n, 1))
-    return shapes, w * scale, h * scale
+            self._show_logo(0)
 
-
-# ----------------------------------------------------------------------
-# timeline: download (progress) -> COMPLETE text + shine -> hold -> fade -> loop
-# ----------------------------------------------------------------------
-DL, T_TXT, T_SHINE, T_HOLD, T_FADE = 300, 40, 46, 50, 30
-A = DL
-B = A + T_TXT
-C = B + T_SHINE
-D = C + T_HOLD
-TOTAL = D + T_FADE
-LAG = 0.03                                   # colour follows the line by 3 %
-GOLD_LINE = np.array([0.98, 0.80, 0.35])
-WHITE = np.ones(3)
-FONTS = ["Cinzel", "Trajan Pro", "Optima", "Palatino Linotype", "Georgia", "DejaVu Serif"]
-
-
-def ease(x):
-    x = np.clip(x, 0, 1)
-    return x * x * (3 - 2 * x)
-
-
-def progress(f):
-    return float(np.clip(f / DL, 0, 1))
-
-
-def start_download(url, destination):
-    """Download in the background and publish byte-accurate progress to the UI."""
-    state = {"progress": 0.0, "done": False, "error": None, "completed_at": None}
-    lock = threading.Lock()
-    destination = os.path.abspath(destination)
-    temporary = destination + ".part"
-
-    def worker():
+    def _download_logo_worker(self) -> None:
         try:
-            request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            request = urllib.request.Request(RAW_LOGO_URL, headers={"User-Agent": "Prime-OS-Setup"})
+            with urllib.request.urlopen(request, timeout=20) as response:
+                image = Image.open(response).convert("RGBA")
+            self.root.after(0, lambda: self._set_downloaded_logo(image))
+        except Exception as exc:
+            self.root.after(0, lambda error=str(exc): self.status.set(f"Could not download the logo: {error}"))
+
+    def _set_downloaded_logo(self, image: Image.Image) -> None:
+        self.logo_source = image
+        self._show_logo(0)
+
+    def _show_logo(self, progress: float) -> None:
+        if self.logo_source is None:
+            return
+        image = self.logo_source.copy()
+        image.thumbnail((540, 270), Image.Resampling.LANCZOS)
+        pixels = image.load()
+        width, height = image.size
+        cutoff = max(0, min(width, int(width * progress)))
+        # Pillow's native image operations keep the 30-fps download animation smooth.
+        ink_alpha = ImageChops.multiply(image.getchannel("A"),
+                                        ImageOps.invert(ImageOps.grayscale(image)))
+        if cutoff < width:
+            ink_alpha.paste(0, (cutoff, 0, width, height))
+        gold = Image.new("RGBA", image.size, (255, 184, 58, 255))
+        gold.putalpha(ink_alpha)
+        self.logo_photo = ImageTk.PhotoImage(gold)
+        self.logo_label.configure(image=self.logo_photo)
+
+    def _check_release_worker(self) -> None:
+        request = urllib.request.Request(API_URL, headers={
+            "Accept": "application/vnd.github+json", "User-Agent": "Prime-OS-Setup",
+        })
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                release = json.load(response)
+            assets = [asset for asset in release.get("assets", [])
+                      if asset.get("name", "").lower().endswith(".iso")]
+            if not assets:
+                self.root.after(0, lambda: self._release_missing(
+                    "The repository has no published ISO yet. The setup wizard works in preview mode; it will not pretend to install an OS."
+                ))
+                return
+            asset = assets[0]
+            self.release_result = asset
+            self.root.after(0, lambda: self._start_download(asset))
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                message = "No Prime-OS release has been published yet. You can save a hardware preference profile, but there is no OS image to install."
+            else:
+                message = f"GitHub release check failed (HTTP {exc.code}). You can retry by reopening the setup."
+            self.root.after(0, lambda: self._release_missing(message))
+        except Exception as exc:
+            self.root.after(0, lambda error=str(exc): self._release_missing(
+                f"Could not reach GitHub: {error}. Check your internet connection and try again."
+            ))
+
+    def _release_missing(self, message: str) -> None:
+        self.status.set(message)
+        self.logo_hint.configure(text="No ISO available — preview setup only")
+        self.progress_value.set(0)
+        self.continue_button.configure(state="normal")
+
+    def _start_download(self, asset: dict) -> None:
+        self.status.set(f"Downloading {asset['name']} from the Prime-OS GitHub release…")
+        self.logo_hint.configure(text="The Faravahar fills with the real download progress")
+        APP_DIR.mkdir(parents=True, exist_ok=True)
+        self.download_path = APP_DIR / asset["name"]
+        threading.Thread(target=self._download_worker, args=(asset,), daemon=True).start()
+
+    def _download_worker(self, asset: dict) -> None:
+        destination = self.download_path
+        assert destination is not None
+        temporary = destination.with_suffix(destination.suffix + ".part")
+        try:
+            request = urllib.request.Request(asset["browser_download_url"], headers={
+                "User-Agent": "Prime-OS-Setup", "Accept": "application/octet-stream",
+            })
             with urllib.request.urlopen(request, timeout=30) as response:
-                total = int(response.headers.get("Content-Length") or 0)
-                if total <= 0:
-                    raise ValueError("The server did not provide a valid Content-Length")
+                expected = int(response.headers.get("Content-Length") or asset.get("size") or 0)
                 downloaded = 0
-                with open(temporary, "wb") as output:
+                with temporary.open("wb") as output:
                     while True:
                         chunk = response.read(256 * 1024)
                         if not chunk:
                             break
                         output.write(chunk)
                         downloaded += len(chunk)
-                        with lock:
-                            state["progress"] = min(downloaded / total, 1.0)
-                if downloaded != total:
-                    raise IOError(f"Incomplete download: received {downloaded} of {total} bytes")
+                        percentage = downloaded / expected * 100 if expected else 0
+                        self.root.after(0, lambda p=percentage: self._download_progress(p))
+                if expected and downloaded != expected:
+                    raise IOError(f"Incomplete download: received {downloaded} of {expected} bytes")
             os.replace(temporary, destination)
-            with lock:
-                state["progress"] = 1.0
-                state["done"] = True
-                state["completed_at"] = time.monotonic()
+            self.root.after(0, lambda: self._download_complete(asset))
         except Exception as exc:
             try:
-                if os.path.exists(temporary):
-                    os.remove(temporary)
+                temporary.unlink(missing_ok=True)
             except OSError:
                 pass
-            with lock:
-                state["error"] = str(exc)
+            self.root.after(0, lambda error=str(exc): self._release_missing(f"ISO download failed: {error}"))
 
-    threading.Thread(target=worker, name="os-download", daemon=True).start()
-    return state, lock
+    def _download_progress(self, percentage: float) -> None:
+        value = max(0, min(100, percentage))
+        self.progress_value.set(value)
+        self._show_logo(value / 100)
+        self.status.set(f"Downloading Prime-OS image… {int(value)}%")
 
+    def _download_complete(self, asset: dict) -> None:
+        self.download_finished = True
+        self.progress_value.set(100)
+        self._show_logo(1)
+        self.logo_hint.configure(text="Download complete · verified against the published file size")
+        self.status.set(f"Downloaded {asset['name']}. Continue to choose your hardware preferences.")
+        self.continue_button.configure(state="normal")
 
-def palette(yn, xn, jit):
-    """yn: 0 bottom..1 top.  Warm gold gradient, brighter near the centre."""
-    lo, mid, hi = np.array([0.74, 0.40, 0.09]), np.array([0.96, 0.70, 0.18]), np.array([1.0, 0.90, 0.52])
-    c = lo * (1 - 2 * yn) + mid * 2 * yn if yn < 0.5 else mid * (2 - 2 * yn) + hi * (2 * yn - 1)
-    c = c * (1 + 0.12 * (1 - abs(xn))) * (1 + jit)
-    return np.clip(c, 0, 1)
+    def _build_preferences(self) -> None:
+        for child in self.root.winfo_children():
+            child.destroy()
+        wrapper = tk.Frame(self.root, bg=BG, padx=40, pady=28)
+        wrapper.pack(fill="both", expand=True)
+        tk.Label(wrapper, text="Choose your gaming profile", fg=TEXT, bg=BG,
+                 font=("Segoe UI", 23, "bold")).pack(anchor="w", pady=(4, 8))
+        tk.Label(wrapper, text=f"Detected system memory: {self.max_ram} GB",
+                 fg=MUTED, bg=BG).pack(anchor="w", pady=(0, 12))
 
+        ram_box = tk.Frame(wrapper, bg=PANEL, padx=18, pady=15)
+        ram_box.pack(fill="x", pady=9)
+        tk.Label(ram_box, text="Memory budget", fg=TEXT, bg=PANEL,
+                 font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        ram_value = tk.Label(ram_box, text="", fg=ACCENT, bg=PANEL)
+        ram_value.pack(anchor="e")
+        ram = ttk.Scale(ram_box, from_=1, to=max(1, self.max_ram - 1),
+                        command=lambda value: (self.ram_choice.set(round(float(value))),
+                                               ram_value.configure(text=f"{self.ram_choice.get()} GB")))
+        ram.set(self.ram_choice.get())
+        ram.pack(fill="x", pady=6)
+        ram_value.configure(text=f"{self.ram_choice.get()} GB")
 
-def main():
-    from matplotlib.collections import PolyCollection, LineCollection
-    import matplotlib.patheffects as pe
-    def option_value(name, default=None):
-        try:
-            return sys.argv[sys.argv.index(name) + 1]
-        except (ValueError, IndexError):
-            return default
+        gpu_box = tk.Frame(wrapper, bg=PANEL, padx=18, pady=15)
+        gpu_box.pack(fill="x", pady=9)
+        tk.Label(gpu_box, text="Graphics budget target", fg=TEXT, bg=PANEL,
+                 font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        self.gpu_label = tk.Label(gpu_box, text="", fg=ACCENT, bg=PANEL)
+        self.gpu_label.pack(anchor="e")
+        gpu = ttk.Scale(gpu_box, from_=5, to=100, command=self._set_gpu_label)
+        gpu.set(self.gpu_choice.get())
+        gpu.pack(fill="x", pady=6)
+        self._set_gpu_label(str(self.gpu_choice.get()))
+        tk.Label(gpu_box, text=gpu_name() + " · This is a preference only; ordinary PCs cannot reserve a GPU by percentage.",
+                 fg=MUTED, bg=PANEL, wraplength=610, justify="left").pack(anchor="w", pady=(5, 0))
 
-    consumed = {option_value("--download"), option_value("--output"), option_value("--bands")}
-    args = [a for a in sys.argv[1:] if not a.startswith("--") and not a.isdigit() and a not in consumed]
-    src = args[0] if args else "faravahar.png"
-    download_url = option_value("--download")
-    download_state, download_lock = start_download(download_url, option_value("--output", "system-image.iso")) if download_url else (None, None)
-    rgb, mask, lineart = make_mask(load_image(src), invert="--invert" in sys.argv)
-    shapes, W, H = trace(rgb, mask, lineart)
-    S = len(shapes)
+        tk.Label(wrapper,
+                 text="These choices are saved as a profile. RAM/GPU are not actually allocated until Prime-OS has a tested installer or VM backend.",
+                 fg=MUTED, bg=BG, wraplength=640, justify="left").pack(anchor="w", pady=12)
+        tk.Button(wrapper, text="Save profile", command=self._save_profile,
+                  bg="#6845c5", fg="white", activebackground="#8060df",
+                  activeforeground="white", relief="flat", padx=20, pady=10).pack(anchor="w", pady=8)
 
-    fig = plt.figure(figsize=(8.8, 6.2), facecolor=BG)
-    ax = fig.add_axes([0, 0, 1, 1], facecolor=BG)
-    yy, xx = np.mgrid[-1:1:160j, -1:1:230j]
-    rr = np.clip(np.hypot(xx * 0.9, yy), 0, 1)[..., None]
-    bg = np.array([0.10, 0.09, 0.16]) * (1 - rr) + np.array([0.02, 0.02, 0.04]) * rr
-    ax.imshow(bg, extent=[-7.2, 7.2, -5.0, 5.0], zorder=-5, aspect="auto")
-    ax.set_xlim(-7.2, 7.2)
-    ax.set_ylim(-5.0, 5.0)
-    ax.set_aspect("equal")
-    ax.axis("off")
+    def _set_gpu_label(self, value: str) -> None:
+        self.gpu_choice.set(round(float(value)))
+        self.gpu_label.configure(text=f"{self.gpu_choice.get()}% target")
 
-    # ---- flatten geometry, build "units" (one ring = one line that gets drawn) ----
-    V0 = np.vstack([r for sh in shapes for r in sh["rings"]])
-    sh_range, ring_a, ring_n, ring_of = [], [], [], {}
-    pos = 0
-    for si, sh in enumerate(shapes):
-        a0 = pos
-        for j, r in enumerate(sh["rings"]):
-            ring_of[(si, j)] = len(ring_a)
-            ring_a.append(pos)
-            ring_n.append(len(r))
-            pos += len(r)
-        sh_range.append((a0, pos))
-        sh["codes"] = np.concatenate([[Path.MOVETO] + [Path.LINETO] * (len(r) - 2) + [Path.CLOSEPOLY]
-                                      for r in sh["rings"]])
-    ring_a, ring_n = np.array(ring_a), np.array(ring_n)
-
-    units = []                                      # (shape, ring_global, cx, cy, perimeter)
-    for si, sh in enumerate(shapes):
-        for j, r in enumerate(sh["rings"]):
-            if lineart and j > 0:                   # holes are already the outlines of other shapes
-                continue
-            per = float(np.sum(np.hypot(*np.diff(r, axis=0).T)))
-            units.append((si, ring_of[(si, j)], r[:, 0].mean(), r[:, 1].mean(), per))
-    band = H / 16
-    is_ink_shape = [sh["kind"] == "ink" for sh in shapes]
-    units.sort(key=lambda u: (is_ink_shape[u[0]], int((u[3] + H / 2) // band), u[2]))   # panels sweep bottom->top, outline closes last
-    U = len(units)
-    u_shape = np.array([u[0] for u in units])
-    u_ring = np.array([u[1] for u in units])
-    dur = np.array([u[4] for u in units]) ** 0.7                         # long lines take longer
-    ends = np.cumsum(dur) / dur.sum()
-    starts = np.r_[0, ends[:-1]]
-    shape_end = np.zeros(S)
-    for ui, si in enumerate(u_shape):
-        shape_end[si] = max(shape_end[si], ends[ui])
-    print(f"traced {S} shapes -> {U} lines, one at a time")
-
-    is_ink = np.array([sh["kind"] == "ink" for sh in shapes])
-    rng = np.random.default_rng(3)
-    cx_s = np.array([V0[a:b, 0].mean() for a, b in sh_range])
-    cy_s = np.array([V0[a:b, 1].mean() for a, b in sh_range])
-    base = np.array([palette((cy_s[i] + H / 2) / H, cx_s[i] / (W / 2), rng.uniform(-0.09, 0.09))
-                     if (lineart and not is_ink[i]) else shapes[i]["rgb"] for i in range(S)])
-    if lineart and "--no-disc" not in sys.argv:          # central ring (lapis blue), tuned for the classic drawing
-        d = np.hypot(cx_s, cy_s + 0.045 * H)
-        inside = (d < 0.078 * W) & ~is_ink
-        shade = rng.uniform(0.85, 1.1, S)[:, None]
-        base[inside] = np.clip(np.array([0.16, 0.38, 0.85])[None] * shade[inside], 0, 1)
-
-    def make_poly(idx, z):
-        col = PolyCollection([V0[sh_range[i][0]:sh_range[i][1]] for i in idx], closed=False,
-                             linewidths=0, zorder=z)
-        col.set_verts_and_codes([V0[sh_range[i][0]:sh_range[i][1]] for i in idx],
-                                [shapes[i]["codes"] for i in idx])
-        ax.add_collection(col)
-        return col
-
-    fill_idx, ink_idx = np.where(~is_ink)[0], np.where(is_ink)[0]
-    layers = [(fill_idx, make_poly(fill_idx, 2)), (ink_idx, make_poly(ink_idx, 3))]
-    lines = LineCollection([], linewidths=1.3, capstyle="round", zorder=5)
-    ax.add_collection(lines)
-    halo = ax.scatter([], [], s=260, c="#ffcf6b", alpha=0.25, zorder=7, linewidths=0)
-    head = ax.scatter([], [], s=45, c="white", zorder=8, linewidths=0)
-
-    # ---- download-bar UI ----
-    TX0, TX1, BY = -4.4, 4.4, -4.0
-    ax.add_patch(Rectangle((TX0, BY), TX1 - TX0, 0.14, fc="#16140f", ec="#6b5521", lw=1, zorder=4))
-    barfill = Rectangle((TX0, BY), 0.0, 0.14, fc="#f2b632", ec="none", zorder=5)
-    ax.add_patch(barfill)
-    glow = [pe.withStroke(linewidth=4, foreground="#5a3a05")]
-    label = ax.text(TX0, BY + 0.38, "D O W N L O A D I N G", color="#cfa84a", fontsize=11,
-                    family=FONTS, va="center", ha="left", zorder=6)
-    pct = ax.text(TX1, BY + 0.38, "0%", color="#ffe29a", fontsize=15, family=FONTS,
-                  va="center", ha="right", zorder=6, path_effects=glow)
-    word = "COMPLETE"
-    xs = (np.arange(8) - 3.5) * 0.74
-    letters = [ax.text(x, -4.62, ch, color="#ffe29a", fontsize=30, family=FONTS, weight="bold",
-                       ha="center", va="center", alpha=0, zorder=6, path_effects=glow)
-               for x, ch in zip(xs, word)]
-    ax.set_xlim(-7.2, 7.2)
-    ax.set_ylim(-5.0, 5.0)
-
-    dyn = [*[c for _, c in layers], lines, halo, head, barfill, label, pct, *letters]
-    for art in dyn:
-        art.set_animated(True)               # redrawn every frame; background/track are cached (blit)
-
-    def update(f):
-        if download_state:
-            with download_lock:
-                state = download_state.copy()
-            p = state["progress"]
-            if state["done"]:
-                f = DL + min((time.monotonic() - state["completed_at"]) * 30, TOTAL - DL)
-            else:
-                f = DL * p
-        p = progress(f) if not download_state else p
-        x = p
-        a_g = 1.0 if download_state else 1.0 - max(0.0, (f - D) / T_FADE)
-        # lines: one unit at a time
-        line = np.clip((x - starts) / (ends - starts), 0, 1)
-        fillv = ease((x - shape_end) / LAG)
-        hot = np.clip(1 - (x - ends) / LAG, 0, 1) * (line > 0)          # bright "just drawn" glow
-        face = 0.97 * fillv * a_g
-        rgbf = base.copy()
-        edge = GOLD_LINE[None] * (1 - hot[:, None]) + WHITE[None] * hot[:, None]
-        if B <= f < C:                                                    # shine sweep at 100 %
-            sx = -W / 2 - 2 + (f - B) / T_SHINE * (W + 4)
-            lift = np.exp(-((cx_s - sx) / 1.3) ** 2) * 0.65
-            rgbf = rgbf * (1 - lift[:, None]) + lift[:, None]
-        for idx, col in layers:
-            col.set_facecolor(np.c_[rgbf[idx], face[idx]])
-        m = np.rint(line * ring_n[u_ring]).astype(int)
-        vis = np.where(m >= 2)[0]
-        lines.set_segments([V0[ring_a[u_ring[i]]:ring_a[u_ring[i]] + m[i]] for i in vis])
-        lines.set_color(np.c_[edge[vis], np.full(len(vis), a_g)])
-        act = np.where((line > 0) & (line < 1))[0]
-        if len(act) and f < A:
-            pts = np.array([V0[ring_a[u_ring[i]] + m[i] - 1] for i in act])
-            head.set_offsets(pts)
-            halo.set_offsets(pts)
+    def _save_profile(self) -> None:
+        profile = {
+            "ram_gb": max(1, min(self.max_ram - 1, self.ram_choice.get())),
+            "gpu_budget_percent": self.gpu_choice.get(),
+            "gpu_detected": gpu_name(),
+            "iso_downloaded": str(self.download_path) if self.download_finished else None,
+            "mode": "preview-only; hardware allocation and OS installation are not implemented",
+        }
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        config_path = CONFIG_DIR / "setup.json"
+        config_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+        for child in self.root.winfo_children():
+            child.destroy()
+        wrapper = tk.Frame(self.root, bg=BG, padx=40, pady=40)
+        wrapper.pack(fill="both", expand=True)
+        tk.Label(wrapper, text="Profile saved", fg=TEXT, bg=BG,
+                 font=("Segoe UI", 24, "bold")).pack(anchor="w", pady=(20, 10))
+        if self.download_finished:
+            detail = (f"Your Prime-OS ISO is ready at:\n{self.download_path}\n\n"
+                      "Reboot from a USB or test it in a virtual machine to start the live desktop. "
+                      "This wizard does not install it onto your computer.")
         else:
-            head.set_offsets(np.empty((0, 2)))
-            halo.set_offsets(np.empty((0, 2)))
-        # bar + text
-        barfill.set_width((TX1 - TX0) * p)
-        barfill.set_alpha(a_g)
-        pct.set_text(f"{int(p * 100)}%")
-        if download_state and state["error"]:
-            label.set_text("DOWNLOAD FAILED")
-        elif download_state and state["done"]:
-            label.set_text("DOWNLOAD COMPLETE")
-        ui = 1.0 if download_state else (1.0 - min(1.0, max(0.0, (f - A) / 10)) if f >= A else 1.0)
-        pct.set_alpha(ui * a_g)
-        label.set_alpha(ui * a_g)
-        for i, t in enumerate(letters):
-            s = ease((f - A - 8 - i * 3) / 10)
-            t.set_alpha(s * a_g)
-            t.set_y(-4.62 - 0.25 * (1 - s))
-        return dyn
+            detail = ("No operating-system ISO is published on GitHub yet, so the desktop cannot be started. "
+                      "Your preference profile is saved; build and publish a tested Prime-OS ISO to continue.")
+        tk.Label(wrapper, text=detail, fg=MUTED, bg=BG, wraplength=620,
+                 justify="left").pack(anchor="w", pady=12)
+        tk.Label(wrapper, text=f"Saved to: {config_path}", fg=ACCENT, bg=BG,
+                 wraplength=620, justify="left").pack(anchor="w", pady=5)
+        tk.Button(wrapper, text="Close", command=self.root.destroy,
+                  bg="#6845c5", fg="white", activebackground="#8060df",
+                  activeforeground="white", relief="flat", padx=20, pady=9).pack(anchor="w", pady=16)
 
-    if "--preview" in sys.argv:
-        for art in dyn:
-            art.set_animated(False)
-        for name, f in [("p30", int(DL * 0.30)), ("p70", int(DL * 0.70)),
-                        ("p100", DL - 1), ("complete", B + 5)]:
-            update(f)
-            fig.savefig(f"loader_{name}.png", dpi=90, facecolor=BG)
-            print("saved", f"loader_{name}.png")
+
+def main() -> None:
+    if "--check" in sys.argv:
+        logo = Path(__file__).resolve().parent / "faravahar.png"
+        if not logo.is_file():
+            raise SystemExit(f"Faravahar image is missing: {logo}")
+        with Image.open(logo) as image:
+            image.verify()
+        print(f"Prime-OS setup checks passed · Python {platform.python_version()} · Pillow {Image.__version__}")
+        print(f"Faravahar image is valid: {logo}")
+        print(f"GitHub ISO release API: {API_URL}")
         return
-
-    if "--bench" in sys.argv:
-        fig.canvas.draw()
-        cache = fig.canvas.copy_from_bbox(fig.bbox)
-        for name, f in [("drawing", 120), ("complete", B + 5)]:
-            t = time.time()
-            for j in range(10):
-                update(f + j)
-                fig.canvas.restore_region(cache)
-                for art in dyn:
-                    ax.draw_artist(art)
-                fig.canvas.blit(fig.bbox)
-            print(name, f"{(time.time() - t) * 100:.0f} ms/frame (blit)")
-        return
-
-    anim = FuncAnimation(fig, update, frames=None if download_state else TOTAL,
-                         interval=33, blit=True, repeat=not bool(download_state), cache_frame_data=False)
-    if "--save" in sys.argv:
-        print("Saving faravahar_loader.gif ...")
-        anim.save("faravahar_loader.gif", writer=PillowWriter(fps=30), dpi=70,
-                  savefig_kwargs={"facecolor": BG})
-    plt.show()
+    root = tk.Tk()
+    PrimeSetup(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
