@@ -19,6 +19,8 @@ git clone --depth 1 "${REPO_URL}" "${TMP_DIR}/repo" \
 mkdir -p "${APP_DIR}"
 install -m 0644 "${TMP_DIR}/repo/loader.py" "${APP_DIR}/loader.py"
 install -m 0644 "${TMP_DIR}/repo/faravahar.png" "${APP_DIR}/faravahar.png"
+install -m 0644 "${TMP_DIR}/repo/you.py" "${APP_DIR}/you.py"
+install -m 0644 "${TMP_DIR}/repo/you.py" "${APP_DIR}/you.py"
 install -m 0644 "${TMP_DIR}/repo/requirements.txt" "${APP_DIR}/requirements.txt"
 
 if [[ "$(uname -s)" == Linux ]] && ! python3 -c 'import tkinter' >/dev/null 2>&1; then

@@ -30,8 +30,13 @@ except ImportError as exc:
 REPO = "fem-dev/Prime-OS"
 API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 RAW_LOGO_URL = f"https://raw.githubusercontent.com/{REPO}/main/faravahar.png"
-APP_DIR = Path(os.environ.get("PRIME_OS_HOME", Path.home() / ".local" / "share" / "prime-os"))
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "prime-os"
+RAW_ART_URL = f"https://raw.githubusercontent.com/{REPO}/main/you.py"
+if os.name == "nt":
+    APP_DIR = Path(os.environ.get("PRIME_OS_HOME", Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Prime-OS"))
+    CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / "Prime-OS"
+else:
+    APP_DIR = Path(os.environ.get("PRIME_OS_HOME", Path.home() / ".local" / "share" / "prime-os"))
+    CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "prime-os"
 BG = "#090d18"
 PANEL = "#121a2a"
 ACCENT = "#a78bfa"
@@ -80,7 +85,10 @@ class PrimeSetup:
         self.root.configure(bg=BG)
         self.root.geometry("760x700")
         self.root.minsize(620, 620)
-        self.root.option_add("*Font", ("Segoe UI", 10))
+        available_fonts = set(self.root.tk.call("font", "families"))
+        self.ui_font = next((name for name in ("Segoe UI Variable", "Segoe UI", "Arial")
+                             if name in available_fonts), "TkDefaultFont")
+        self.root.option_add("*Font", (self.ui_font, 10))
 
         self.max_ram = total_memory_gb()
         self.ram_choice = tk.IntVar(value=max(1, min(4, self.max_ram - 1)))
@@ -109,14 +117,14 @@ class PrimeSetup:
         wrapper = tk.Frame(self.root, bg=BG, padx=34, pady=24)
         wrapper.pack(fill="both", expand=True)
         tk.Label(wrapper, text="PRIME-OS", fg=TEXT, bg=BG,
-                 font=("Segoe UI", 25, "bold")).pack(pady=(8, 2))
+                 font=(self.ui_font, 25, "bold")).pack(pady=(8, 2))
         tk.Label(wrapper, text="GAMING SYSTEM · EARLY PREVIEW", fg=ACCENT, bg=BG,
-                 font=("Segoe UI", 9, "bold")).pack(pady=(0, 12))
+                 font=(self.ui_font, 9, "bold")).pack(pady=(0, 12))
 
         self.logo_label = tk.Label(wrapper, bg=BG)
         self.logo_label.pack(pady=4)
-        self.logo_hint = tk.Label(wrapper, text="", fg=MUTED, bg=BG,
-                                  font=("Segoe UI", 9))
+        self.logo_hint = tk.Label(wrapper, text="Loading you.py artwork module…", fg=MUTED, bg=BG,
+                                  font=(self.ui_font, 9))
         self.logo_hint.pack(pady=(0, 8))
 
         self.progress = ttk.Progressbar(wrapper, style="Prime.Horizontal.TProgressbar",
@@ -135,8 +143,34 @@ class PrimeSetup:
         tk.Label(wrapper,
                  text="Preview only: this app never flashes a USB, changes partitions, or installs over your OS.",
                  fg=MUTED, bg=BG, wraplength=620, justify="center",
-                 font=("Segoe UI", 9)).pack(side="bottom", pady=(12, 0))
+                 font=(self.ui_font, 9)).pack(side="bottom", pady=(12, 0))
         self._load_logo()
+        threading.Thread(target=self._load_art_module, daemon=True).start()
+
+    def _load_art_module(self) -> None:
+        """Fetch and validate the supplied drawing module without executing it."""
+        target = APP_DIR / "you.py"
+        try:
+            source = Path(__file__).resolve().parent / "you.py"
+            if not source.is_file():
+                source = target
+            if not source.is_file():
+                APP_DIR.mkdir(parents=True, exist_ok=True)
+                request = urllib.request.Request(RAW_ART_URL, headers={"User-Agent": "Prime-OS-Setup"})
+                with urllib.request.urlopen(request, timeout=20) as response:
+                    content = response.read(2 * 1024 * 1024 + 1)
+                if len(content) > 2 * 1024 * 1024:
+                    raise ValueError("you.py exceeds the 2 MiB safety limit")
+                source = target
+                source.write_bytes(content)
+            content = source.read_bytes()
+            if len(content) > 2 * 1024 * 1024:
+                raise ValueError("you.py exceeds the 2 MiB safety limit")
+            compile(content, str(source), "exec")
+            self.root.after(0, lambda: self.logo_hint.configure(text="Faravahar artwork module loaded · ready"))
+        except Exception as exc:
+            self.root.after(0, lambda error=str(exc): self.logo_hint.configure(
+                text=f"Could not load you.py: {error}"))
 
     def _load_logo(self) -> None:
         candidates = [Path(__file__).resolve().parent / "faravahar.png",
@@ -277,14 +311,14 @@ class PrimeSetup:
         wrapper = tk.Frame(self.root, bg=BG, padx=40, pady=28)
         wrapper.pack(fill="both", expand=True)
         tk.Label(wrapper, text="Choose your gaming profile", fg=TEXT, bg=BG,
-                 font=("Segoe UI", 23, "bold")).pack(anchor="w", pady=(4, 8))
+                 font=(self.ui_font, 23, "bold")).pack(anchor="w", pady=(4, 8))
         tk.Label(wrapper, text=f"Detected system memory: {self.max_ram} GB",
                  fg=MUTED, bg=BG).pack(anchor="w", pady=(0, 12))
 
         ram_box = tk.Frame(wrapper, bg=PANEL, padx=18, pady=15)
         ram_box.pack(fill="x", pady=9)
         tk.Label(ram_box, text="Memory budget", fg=TEXT, bg=PANEL,
-                 font=("Segoe UI", 12, "bold")).pack(anchor="w")
+                 font=(self.ui_font, 12, "bold")).pack(anchor="w")
         ram_value = tk.Label(ram_box, text="", fg=ACCENT, bg=PANEL)
         ram_value.pack(anchor="e")
         ram = ttk.Scale(ram_box, from_=1, to=max(1, self.max_ram - 1),
@@ -297,7 +331,7 @@ class PrimeSetup:
         gpu_box = tk.Frame(wrapper, bg=PANEL, padx=18, pady=15)
         gpu_box.pack(fill="x", pady=9)
         tk.Label(gpu_box, text="Graphics budget target", fg=TEXT, bg=PANEL,
-                 font=("Segoe UI", 12, "bold")).pack(anchor="w")
+                 font=(self.ui_font, 12, "bold")).pack(anchor="w")
         self.gpu_label = tk.Label(gpu_box, text="", fg=ACCENT, bg=PANEL)
         self.gpu_label.pack(anchor="e")
         gpu = ttk.Scale(gpu_box, from_=5, to=100, command=self._set_gpu_label)
@@ -334,7 +368,7 @@ class PrimeSetup:
         wrapper = tk.Frame(self.root, bg=BG, padx=40, pady=40)
         wrapper.pack(fill="both", expand=True)
         tk.Label(wrapper, text="Profile saved", fg=TEXT, bg=BG,
-                 font=("Segoe UI", 24, "bold")).pack(anchor="w", pady=(20, 10))
+                 font=(self.ui_font, 24, "bold")).pack(anchor="w", pady=(20, 10))
         if self.download_finished:
             detail = (f"Your Prime-OS ISO is ready at:\n{self.download_path}\n\n"
                       "Reboot from a USB or test it in a virtual machine to start the live desktop. "

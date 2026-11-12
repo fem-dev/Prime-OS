@@ -2,12 +2,15 @@
 
 **Prime-OS** is an early, community-built gaming Linux project based on Arch Linux and the [Hyprland](https://hyprland.org/) Wayland compositor. The current milestone is a bootable **live ISO prototype**, not yet a finished installer or a production-ready operating system. [راهنمای فارسی](README.fa.md)
 
+The setup launcher supports Windows, Linux and macOS. Windows uses the native Segoe UI font when available and stores app data under `%LOCALAPPDATA%\\Prime-OS`, with preferences under `%APPDATA%\\Prime-OS`. This opens the Windows setup preview; it does not replace Windows with Arch/Hyprland.
+
 > Game performance and hardware compatibility depend on your GPU, drivers, game, and hardware. They cannot be guaranteed to be lag-free. Test the ISO in a virtual machine first; use a spare USB drive if you test on physical hardware.
 
 ## What is included in the prototype
 
 - Arch Linux live environment, built using the official `archiso` releng profile.
 - Hyprland, Waybar, Wofi, Kitty, NetworkManager and PipeWire.
+- A cross-platform setup wizard for Windows, Linux and macOS that uses a system font fallback and loads the supplied `you.py` artwork module without executing it.
 - Steam, Lutris and Mesa/Vulkan gaming packages.
 - A minimal first-boot graphical session as a regular `prime` user.
 - A convenience wrapper that creates `out/os.iso`.

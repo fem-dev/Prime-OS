@@ -26,6 +26,7 @@ try {
     New-Item -ItemType Directory -Force -Path $appDir | Out-Null
     Copy-Item (Join-Path $temp 'repo/loader.py') $appDir -Force
     Copy-Item (Join-Path $temp 'repo/faravahar.png') $appDir -Force
+    Copy-Item (Join-Path $temp 'repo/you.py') $appDir -Force
     Copy-Item (Join-Path $temp 'repo/requirements.txt') $appDir -Force
 
     $venvDirectory = Join-Path $appDir 'venv'
