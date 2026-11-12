@@ -1,0 +1,30 @@
+* {
+  font-family: "Noto Sans", "Noto Sans Arabic", sans-serif;
+  font-size: 12px;
+  min-height: 0;
+}
+
+window#waybar {
+  background: rgba(10, 14, 24, 0.92);
+  color: #e5e7eb;
+  border-bottom: 1px solid rgba(121, 107, 255, 0.65);
+}
+
+#workspaces button {
+  color: #9ca3af;
+  padding: 0 9px;
+  border-radius: 8px;
+}
+
+#workspaces button.active {
+  color: #ffffff;
+  background: linear-gradient(120deg, #2563eb, #7c3aed);
+}
+
+#clock, #cpu, #memory, #network, #pulseaudio, #tray, #window {
+  padding: 0 9px;
+}
+
+#clock { color: #c4b5fd; }
+#cpu, #memory { color: #93c5fd; }
+#network, #pulseaudio { color: #a7f3d0; }

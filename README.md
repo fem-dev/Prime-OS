@@ -1,61 +1,57 @@
 # Prime-OS
 
-**Prime-OS** is an early gaming-Linux project based on Arch Linux and the Hyprland Wayland compositor. [فارسی](README.fa.md)
+**Prime-OS** is an early, community-built gaming Linux project based on Arch Linux and the [Hyprland](https://hyprland.org/) Wayland compositor. The current milestone is a bootable **live ISO prototype**, not yet a finished installer or a production-ready operating system. [راهنمای فارسی](README.fa.md)
 
-> Current status: an experimental setup wizard and a live-ISO build profile. **There is no published Prime-OS ISO or disk installer yet.** The wizard never repartitions, formats, flashes, or replaces your operating system. Hardware budget choices are saved as preferences only: ordinary desktop apps cannot reserve a percentage of the physical GPU or isolated RAM for an OS that is not yet installed.
+> Game performance and hardware compatibility depend on your GPU, drivers, game, and hardware. They cannot be guaranteed to be lag-free. Test the ISO in a virtual machine first; use a spare USB drive if you test on physical hardware.
 
-## One-command preview setup
+## What is included in the prototype
 
-The commands below fetch the launcher and Faravahar artwork from this public GitHub repository, create an isolated Python environment, install Pillow, and start the graphical wizard. Use `bash` and `git` on Linux/macOS, or PowerShell with Git for Windows and Python 3 on Windows.
+- Arch Linux live environment, built using the official `archiso` releng profile.
+- Hyprland, Waybar, Wofi, Kitty, NetworkManager and PipeWire.
+- Steam, Lutris and Mesa/Vulkan gaming packages.
+- A minimal first-boot graphical session as a regular `prime` user.
+- A convenience wrapper that creates `out/os.iso`.
 
-### Linux / macOS
+This image is for preview and testing. It does **not** currently install Prime-OS onto a disk. Secure Boot, an install wizard, hardware-specific performance tuning and automated hardware testing are not implemented yet. The package list contains common graphics drivers, but one ISO cannot include every proprietary GPU driver; NVIDIA open-kernel-module support also depends on the graphics card model.
 
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh)
-```
+## Fast start on Linux
 
-Alternative if process substitution is unavailable:
-
-```bash
-curl -fsSLO https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh && bash install.sh
-```
-
-### Windows PowerShell
-
-```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
-```
-
-For a safer option that lets you inspect the installer before running it, download `install.ps1` first and run it from disk:
-
-```powershell
-Invoke-WebRequest https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 -OutFile install-prime-os.ps1
-notepad .\install-prime-os.ps1
-.\install-prime-os.ps1
-```
-
-## What the wizard currently does
-
-1. Downloads the app files from the public GitHub repository.
-2. Fetches the latest GitHub release metadata. **When a release with an ISO asset is published**, it downloads the ISO and reveals the Faravahar according to real bytes received. The current repository has no ISO release, so today the wizard displays that status instead of making a fake download.
-3. Asks for a RAM preference and GPU budget target, and saves them to `~/.config/prime-os/setup.json` (Windows: `%USERPROFILE%\.config\prime-os\setup.json`). These values are not hardware allocations.
-4. When a real, tested ISO is published, the downloaded image can be booted from a USB or in a virtual machine. The setup wizard does not install it on the host.
-
-The loader requires only Python 3 and Pillow; its image animation uses Pillow's native image operations to avoid slowing the download UI with Python per-pixel loops.
-
-## Developer checks
+The image builder currently requires a native Arch Linux build environment with `archiso` installed. A recommended beginner path is to install Arch Linux in a virtual machine first.
 
 ```bash
-python -m pip install -r requirements.txt
-python -m py_compile loader.py
-python loader.py
+git clone https://github.com/fem-dev/Prime-OS.git
+cd Prime-OS
+sudo pacman -Syu --needed archiso
+sudo ./build.sh
 ```
 
-To build the **experimental live ISO** separately, use Arch Linux and follow [README.fa.md](README.fa.md) and `build.sh`. The image build has not yet been validated in a full Arch VM or on physical gaming hardware.
+The finished image is `out/os.iso`. The first build needs an internet connection and downloads many Arch packages. A few gigabytes of free disk space may be needed in addition to the working directory.
 
-## Project roadmap
+### Build on Windows
 
-1. Test the setup flow and loader on Windows, Linux, and macOS.
-2. Build and boot the Hyprland Arch live ISO in a VM.
-3. Test real GPU drivers, Steam/Proton, startup and recovery on supported hardware.
-4. Only then design an opt-in installer and safe resource-management features.
+Windows cannot build a bootable Arch ISO directly. Install **WSL2** and an Arch Linux distribution in WSL, then open the project folder from within that Arch environment and run the Linux commands above. For best build reliability and speed, build in Arch Linux on a VM or a Linux machine. `build.ps1` is only a convenience launcher when WSL already has a working Arch environment and can access the project folder.
+
+## Try the ISO
+
+Boot `out/os.iso` in a UEFI virtual machine (for example, QEMU or VirtualBox), or write it to a spare USB drive with an image-writing tool. Booting an ISO does **not** install it to your computer. Never flash a drive that contains files you need.
+
+In Hyprland, press:
+
+- `Super + Enter` — terminal
+- `Super + D` — application launcher
+- `Super + G` — Steam
+- `Super + B` — browser
+- `Super + N` — network settings
+- `Super + M` — exit Hyprland
+
+## Build script options
+
+```bash
+sudo ./build.sh
+```
+
+`build.sh` validates that it is running as root on Arch Linux, copies the installed official `archiso` releng profile into `.build/profile`, enables the official multilib repository in that temporary profile for Steam, and writes build output to `out/`. Generated work files and ISO images are ignored by Git. The Arch profile is copied from the local `archiso` package at build time so its boot files and configuration stay in step with the installed version.
+
+## Project status
+
+This is the starting point, not a claim that a complete gaming OS already exists. Next milestones: build and boot the first ISO, fix startup/package issues on real test hardware, design an installer, then add tested gaming profiles and update/recovery flows. Contributions and hardware test reports are welcome.

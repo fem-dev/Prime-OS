@@ -1,0 +1,52 @@
+# Core (archiso releng profile supplies Linux, firmware and bootloader packages)
+base
+sudo
+networkmanager
+nm-connection-editor
+
+# Wayland gaming desktop
+hyprland
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+waybar
+wofi
+pavucontrol
+kitty
+swaybg
+dunst
+polkit-gnome
+qt5-wayland
+qt6-wayland
+noto-fonts
+noto-fonts-emoji
+
+# Audio
+pipewire
+pipewire-alsa
+pipewire-pulse
+wireplumber
+alsa-utils
+
+# Vulkan/Mesa for AMD, Intel and Nouveau; NVIDIA open driver for supported cards
+mesa
+vulkan-radeon
+vulkan-intel
+vulkan-nouveau
+nvidia-open
+nvidia-utils
+nvidia-settings
+lib32-mesa
+lib32-vulkan-radeon
+lib32-vulkan-intel
+lib32-vulkan-nouveau
+lib32-nvidia-utils
+
+# Gaming and common desktop utilities
+steam
+lutris
+flatpak
+firefox
+bluez
+bluez-utils
+udisks2
+ntfs-3g
