@@ -30,9 +30,17 @@ sudo ./build.sh
 
 The finished image is `out/os.iso`. The first build needs an internet connection and downloads many Arch packages. A few gigabytes of free disk space may be needed in addition to the working directory.
 
-### Build on Windows
+### Build and run on Windows
 
-Windows cannot build a bootable Arch ISO directly. Install **WSL2** and an Arch Linux distribution in WSL, then open the project folder from within that Arch environment and run the Linux commands above. For best build reliability and speed, build in Arch Linux on a VM or a Linux machine. `build.ps1` is only a convenience launcher when WSL already has a working Arch environment and can access the project folder.
+Windows cannot build a bootable Arch ISO directly. Install **WSL2** and an Arch Linux distribution in WSL, then build with `sudo ./build.sh`. For best reliability, build in an Arch Linux VM or on a Linux machine.
+
+To run a built ISO in a disposable QEMU virtual machine from **Git Bash**, install QEMU for Windows and run:
+
+```bash
+./run-windows.sh
+```
+
+The script expects `out/os.iso`. An alternate ISO path can be passed as `./run-windows.sh /path/to/os.iso`. It boots the image read-only and does not modify Windows disks. If QEMU's WHPX accelerator is unavailable, change the final QEMU acceleration option from `-accel whpx:tcg` to `-accel tcg`.
 
 ## Try the ISO
 
