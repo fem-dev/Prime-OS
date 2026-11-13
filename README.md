@@ -2,6 +2,11 @@
 
 **English** · [فارسی](README.fa.md) · [العربية](README.ar.md) · [Español](README.es.md) · [Deutsch](README.de.md)
 
+> [!CAUTION]
+> **Read [NOTICE.md](NOTICE.md) before you download, build, mirror or redistribute anything.** Prime-OS
+> is an unaffiliated, unfinished prototype: no proprietary software or drivers are redistributed,
+> nothing is guaranteed to work, and a wrong drive selection or a misused tool can destroy data.
+
 **Prime-OS** is a community-built gaming Linux project based on **Arch Linux** and the
 [Hyprland](https://hyprland.org/) Wayland compositor. The current milestone is a **bootable live
 ISO prototype** — not a finished installer and not a production-ready operating system.
@@ -148,6 +153,7 @@ for interactive testing with the same Docker command, and the progress wrapper w
 | `build.sh` / `build.ps1` | Reproducible ISO build inside Docker |
 | `run-windows.sh` | Boot the built ISO in QEMU from Git Bash |
 | `requirements.txt` | Python dependency (`Pillow`) for the wizard |
+| `NOTICE.md` | What the project is and is not: licensing, trademarks, safety, status |
 | `.github/` | Actions workflow that builds the ISO and publishes it to releases |
 
 The live session is started once, on `tty1`, by the `getty` autologin drop-in plus

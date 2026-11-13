@@ -2,6 +2,12 @@
 
 [English](README.md) · [فارسی](README.fa.md) · [العربية](README.ar.md) · [Español](README.es.md) · **Deutsch**
 
+> [!CAUTION]
+> **Lies [NOTICE.md](NOTICE.md), bevor du etwas herunterlädst, baust, spiegelst oder weitergibst.**
+> Prime-OS ist ein unabhängiger, unfertiger Prototyp: Es wird keine proprietäre Software und kein
+> proprietärer Treiber weitergegeben, nichts ist garantiert, und ein falsches Laufwerk oder ein
+> missbräuchlich genutztes Werkzeug kann Daten zerstören.
+
 **Prime-OS** ist ein von der Community entwickeltes Gaming-Linux auf Basis von **Arch Linux** und
 dem Wayland-Compositor [Hyprland](https://hyprland.org/). Der aktuelle Meilenstein ist ein
 **bootfähiger Live-ISO-Prototyp** – kein fertiger Installer und kein produktionsreifes Betriebssystem.
@@ -151,6 +157,7 @@ Codespace eignet sich für interaktive Tests mit demselben Docker-Befehl.
 | `build.sh` / `build.ps1` | Reproduzierbarer ISO-Build in Docker |
 | `run-windows.sh` | Startet die gebaute ISO in QEMU aus der Git Bash |
 | `requirements.txt` | Python-Abhängigkeit (`Pillow`) |
+| `NOTICE.md` | Was das Projekt ist und was nicht: Lizenzen, Marken, Sicherheit, Status |
 | `.github/` | Actions-Workflow, der die ISO baut und als Release veröffentlicht |
 
 Die Live-Sitzung startet genau einmal auf `tty1` über das `getty`-Autologin-Drop-in zusammen mit
