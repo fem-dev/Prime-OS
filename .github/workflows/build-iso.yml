@@ -170,16 +170,10 @@ jobs:
             if gh release view "$TAG" >/dev/null 2>&1; then
               gh release upload "$TAG" out/os.iso out/os.iso.sha256 --clobber
             else
-              notes=$(cat <<'NOTES'
-Prime-OS live image, built by GitHub Actions.
-
-Boot it in a virtual machine or write it to a spare USB drive, then verify the download:
-
-  sha256sum -c os.iso.sha256
-NOTES
-              )
               gh release create "$TAG" out/os.iso out/os.iso.sha256 \
-                --title "Prime-OS $TAG" --notes "$notes" $PRERELEASE_FLAG
+                --title "Prime-OS $TAG" \
+                --notes "Prime-OS live image, built by GitHub Actions. Verify with: sha256sum -c os.iso.sha256" \
+                $PRERELEASE_FLAG
             fi
             echo "Release $TAG published successfully with ISO asset ($((ISO_BYTES / 1024 / 1024)) MiB)" >> "$GITHUB_STEP_SUMMARY"
             gh release view "$TAG" --json assets --jq '.assets[].name' >> "$GITHUB_STEP_SUMMARY" || true
