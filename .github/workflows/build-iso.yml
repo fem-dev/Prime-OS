@@ -17,6 +17,15 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - main
+    paths:
+      - "profile/**"
+      - "build.sh"
+      - "build.ps1"
+      - "run-windows.sh"
+      - ".github/workflows/build-iso.yml"
+      - ".github/scripts/**"
 
 permissions:
   contents: write
@@ -30,8 +39,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
-      PRERELEASE: ${{ inputs.prerelease && '--prerelease' || '' }}
+      # A manual run uses the tag you type, a v* tag push uses the tag name, and a
+      # push to main refreshes the rolling os-preview release.
+      TAG: ${{ inputs.tag || (github.ref_type == 'tags' && github.ref_name || 'os-preview') }}
+      PRERELEASE: ${{ (inputs.prerelease == false) && '' || '--prerelease' }}
     steps:
       - uses: actions/checkout@v4
 
