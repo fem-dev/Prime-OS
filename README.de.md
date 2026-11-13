@@ -128,6 +128,16 @@ diesem temporären Profil**, führt `profile/packages.x86_64` zusammen und schre
 Windows kann eine Arch-ISO nicht direkt bauen – nutze WSL2 mit einer Arch-Distribution oder
 `build.ps1` mit Docker Desktop.
 
+### In CI bauen (GitHub Actions, kein lokaler Build)
+
+1. **Actions → Build and publish ISO → Run workflow** öffnen.
+2. Ein Release-Tag angeben (Standard `os-preview`); das Release wird bei Bedarf angelegt.
+3. Der Job baut in einem privilegierten Docker-Container, zeigt **einen Fortschrittsbalken** und lädt
+   danach `os.iso` und `os.iso.sha256` in dieses Release. Das vollständige Log bleibt als Artifact.
+
+Ein `v*`-Tag zu pushen macht dasselbe. Auf dem eigenen Rechner muss nichts gebaut werden; ein
+Codespace eignet sich für interaktive Tests mit demselben Docker-Befehl.
+
 ## Repository-Aufbau
 
 | Pfad | Zweck |
@@ -141,6 +151,7 @@ Windows kann eine Arch-ISO nicht direkt bauen – nutze WSL2 mit einer Arch-Dist
 | `build.sh` / `build.ps1` | Reproduzierbarer ISO-Build in Docker |
 | `run-windows.sh` | Startet die gebaute ISO in QEMU aus der Git Bash |
 | `requirements.txt` | Python-Abhängigkeit (`Pillow`) |
+| `.github/` | Actions-Workflow, der die ISO baut und als Release veröffentlicht |
 
 Die Live-Sitzung startet genau einmal auf `tty1` über das `getty`-Autologin-Drop-in zusammen mit
 `/etc/skel/.bash_profile`; `prime-os-live-setup` legt den unprivilegierten Benutzer `prime` an und

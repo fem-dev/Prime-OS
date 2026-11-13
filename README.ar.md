@@ -116,6 +116,16 @@ docker run --rm --privileged \
 
 لا يستطيع Windows بناء ISO لـ Arch مباشرة — استخدم WSL2 مع توزيعة Arch أو `build.ps1` مع Docker Desktop.
 
+### البناء في CI (GitHub Actions — دون بناء على جهازك)
+
+1. افتح **Actions → Build and publish ISO → Run workflow**.
+2. أدخل وسم الإصدار (افتراضيًا `os-preview`)؛ يُنشأ الإصدار إن لم يكن موجودًا.
+3. تُبنى الصورة داخل حاوية Docker بصلاحيات privileged، ويعرض التقدّم **شريطًا واحدًا**، ثم يرفع
+   `os.iso` و`os.iso.sha256` إلى ذلك الإصدار. ويُحفظ السجل الكامل كـ artifact.
+
+دفع وسم `v*` يفعل الشيء نفسه. لا حاجة لبناء أي شيء على جهازك، ويمكن استخدام Codespace للاختبار
+التفاعلي بالأمر نفسه مع أدوات Docker.
+
 ## هيكل المستودع
 
 | المسار | الوظيفة |
@@ -129,6 +139,7 @@ docker run --rm --privileged \
 | `build.sh` / `build.ps1` | بناء ISO قابل للتكرار داخل Docker |
 | `run-windows.sh` | إقلاع ISO المبني في QEMU من Git Bash |
 | `requirements.txt` | اعتمادية بايثون (`Pillow`) |
+| `.github/` | سير عمل Actions لبناء ISO ونشره في الإصدارات |
 
 تبدأ الجلسة الحيّة مرة واحدة وعلى `tty1` عبر ملف الدخول التلقائي لـ `getty` مع
 `/etc/skel/.bash_profile`؛ وينشئ `prime-os-live-setup` المستخدم غير المميّز `prime` ويثبّت ملف
