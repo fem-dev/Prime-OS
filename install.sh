@@ -18,7 +18,7 @@ git clone --depth 1 "${REPO_URL}" "${TMP_DIR}/repo" \
 
 mkdir -p "${APP_DIR}"
 printf '%s  %s\n' \
-    "7c7c55dab38ec33cc4ea1217447340c947ca316226fd605dd15cf9cd11511b18" \
+    "6ab139d5981b876e57861816816ad857280afc0a7bc97f366bcc506a972b6b93" \
     "${TMP_DIR}/repo/loader.py" | sha256sum --check --status \
     || fail "loader.py SHA-256 verification failed. The download was not installed."
 printf '%s  %s\n' \
@@ -51,5 +51,8 @@ fi
 "${PYTHON}" -m pip install --disable-pip-version-check -r "${APP_DIR}/requirements.txt" \
     || fail "Could not install the graphical loader dependencies."
 
-printf '\nStarting Prime-OS setup. This downloads code and a logo, not an operating system.\n'
+"${PYTHON}" "${APP_DIR}/loader.py" --check \
+    || fail "The Prime-OS launcher failed its self check; the installation is not usable."
+
+printf '\nStarting Prime-OS setup. It downloads the published live image, not an operating system.\n'
 exec "${PYTHON}" "${APP_DIR}/loader.py"
