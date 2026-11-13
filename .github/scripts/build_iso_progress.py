@@ -2,48 +2,105 @@
 """Run the Prime-OS ISO build behind a single progress bar.
 
 The full, noisy container output goes to ``build.log``; the console shows one
-updating bar with the current stage. On a terminal the bar redraws in place, and
-in CI logs (no TTY) exactly one line is printed per stage, so the job log stays
-readable instead of showing thousands of package lines.
+bar with the current stage, the elapsed time and a short hint of the newest log
+line.
+
+* On a terminal the bar redraws in place about twice a second.
+* In a CI log (no TTY) it prints one line per stage change **and one line per
+  heartbeat**, from an independent timer — so a quiet stage (``mksquashfs``
+  compressing several GiB can take 20+ minutes without printing much) still
+  shows the bar moving instead of looking hung, and the log never floods.
 
 On failure the last lines of the log are printed and the exit code is preserved.
+``Ctrl+C`` terminates the whole process group, so no container is left behind.
 """
 from __future__ import annotations
 
 import argparse
+import os
+import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
-# (keywords that mark the start of a stage, start percent, human label)
+# (keywords that start the stage, percent at that moment, human label).
+# A stage's ceiling is the next stage's start, so the bar keeps creeping forward
+# inside a long stage instead of freezing.
 STAGES: tuple[tuple[tuple[str, ...], float, str], ...] = (
-    (("installing packages", "pacstrap", "pacman -s"), 6.0, "installing packages"),
-    (("copying airootfs", "copying custom airootfs", "airootfs"), 30.0, "building the live filesystem"),
-    (("creating squashfs", "mksquashfs", "squashfs image"), 45.0, "compressing the filesystem"),
-    (("creating iso", "xorriso", "el torito", "creating a bootable"), 88.0, "writing the ISO image"),
+    (("installing packages", "pacstrap"), 4.0, "installing packages"),
+    (("copying custom airootfs", "copying /etc/skel", "copying /boot"), 24.0,
+     "assembling the live filesystem"),
+    (("creating squashfs", "creating erofs", "mksquashfs"), 30.0,
+     "compressing the filesystem (the long step)"),
+    (("creating iso image", "writing the iso", "el torito"), 86.0, "writing the ISO image"),
+    (("creating checksum", "signing rootfs"), 96.0, "checksums and signing"),
 )
-BAR_WIDTH = 28
+BAR_WIDTH = 24
 TAIL_LINES = 80
+HINT_CHARS = 90
+CREEP_PER_SECOND = 0.4
 
 
-def stage_for(line: str, current: int) -> int:
-    """Return the furthest stage index matched by ``line``."""
-    lowered = line.lower()
-    for index, (keywords, _start, _label) in enumerate(STAGES):
-        if index > current and any(keyword in lowered for keyword in keywords):
-            current = index
-    return current
+class Board:
+    """Thread-safe-enough shared state for the bar and the heartbeat timer."""
+
+    def __init__(self) -> None:
+        self.stage = 0
+        self.started = time.monotonic()
+        self.stage_started = self.started
+        self.hint = ""
+        self.stopped = False
+        self.lock = threading.Lock()
+
+    def percent(self) -> float:
+        base = STAGES[self.stage][1]
+        ceiling = STAGES[self.stage + 1][1] - 1.0 if self.stage + 1 < len(STAGES) else 99.0
+        return min(ceiling, base + (time.monotonic() - self.stage_started) * CREEP_PER_SECOND)
+
+    def label(self) -> str:
+        return STAGES[self.stage][2]
+
+    def elapsed(self) -> float:
+        return time.monotonic() - self.started
 
 
-def paint(percent: float, label: str) -> str:
+def paint(percent: float, label: str, elapsed: float, hint: str = "") -> str:
     filled = max(0, min(BAR_WIDTH, int(round(percent / 100.0 * BAR_WIDTH))))
-    return f"  {'█' * filled}{'░' * (BAR_WIDTH - filled)} {percent:5.1f}%  {label}"
+    line = f"  {'█' * filled}{'░' * (BAR_WIDTH - filled)} {percent:5.1f}%  {label}  ·  {elapsed / 60:5.1f} min"
+    if hint:
+        line += f"  ·  last: {hint[:HINT_CHARS]}"
+    return line
+
+
+def hint_from(line: str) -> str:
+    return " ".join(line.strip().split())
+
+
+def terminate(process: subprocess.Popen) -> None:
+    """Stop the whole process group so docker's children do not survive."""
+    try:
+        group = os.getpgid(process.pid)
+    except OSError:
+        return
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(group, sig)
+        except OSError:
+            return
+        try:
+            process.wait(timeout=15)
+            return
+        except subprocess.TimeoutExpired:
+            continue
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Build the ISO behind one progress bar.")
     parser.add_argument("--log", default="build.log", help="where the full build output is written")
+    parser.add_argument("--heartbeat", type=float, default=45.0,
+                        help="seconds between bar updates in a non-interactive log")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="command to run (after --)")
     args = parser.parse_args(argv)
 
@@ -54,14 +111,28 @@ def main(argv: list[str]) -> int:
         parser.error("no build command given; pass it after --")
 
     tty = sys.stdout.isatty()
+    interval = 0.5 if tty else max(5.0, args.heartbeat)
+    board = Board()
     log_path = Path(args.log)
-    stage = 0
-    started = time.monotonic()
-    stage_started = started
-    last_render = 0.0
+    write_lock = threading.Lock()
+
+    def show() -> None:
+        with write_lock:
+            line = paint(board.percent(), board.label(), board.elapsed(), board.hint)
+            if tty:
+                sys.stdout.write("\r\x1b[2K" + line)
+            else:
+                print(line, flush=True)
+            sys.stdout.flush()
+
+    def heartbeat() -> None:
+        while not board.stopped:
+            time.sleep(interval)
+            if not board.stopped:
+                show()
 
     print("Prime-OS ISO build", flush=True)
-    print(paint(STAGES[0][1], STAGES[0][2]), flush=True)
+    show()
 
     with log_path.open("w", encoding="utf-8", errors="replace") as log:
         log.write("$ " + " ".join(command) + "\n")
@@ -73,52 +144,53 @@ def main(argv: list[str]) -> int:
             text=True,
             errors="replace",
             bufsize=1,
+            start_new_session=True,
         )
         assert process.stdout is not None
+        ticker = threading.Thread(target=heartbeat, daemon=True)
+        ticker.start()
         try:
             for line in process.stdout:
                 log.write(line)
                 log.flush()
-                found = stage_for(line, stage)
-                if found != stage:
-                    stage, stage_started = found, time.monotonic()
-                    stage_line = paint(STAGES[stage][1], STAGES[stage][2])
-                    if tty:  # replace the bar instead of starting a new line
-                        sys.stdout.write("\r\x1b[2K" + stage_line)
-                        sys.stdout.flush()
-                    else:  # one readable line per stage in CI logs
-                        print(stage_line, flush=True)
-                now = time.monotonic()
-                if tty and now - last_render > 0.5:
-                    last_render = now
-                    base, label = STAGES[stage][1], STAGES[stage][2]
-                    ceiling = STAGES[stage + 1][1] - 2.0 if stage + 1 < len(STAGES) else 99.0
-                    creep = min(ceiling, base + (now - stage_started) * 0.25)
-                    sys.stdout.write("\r\x1b[2K" + paint(creep, label))
-                    sys.stdout.flush()
+                if not line.strip():
+                    continue
+                board.hint = hint_from(line)
+                found = next(
+                    (index for index, (keywords, _start, _label) in enumerate(STAGES)
+                     if index > board.stage and any(k in line.lower() for k in keywords)),
+                    board.stage,
+                )
+                if found != board.stage:
+                    board.stage = found
+                    board.stage_started = time.monotonic()
+                    show()
             code = process.wait()
         except KeyboardInterrupt:
-            process.terminate()
-            process.wait(timeout=30)
+            terminate(process)
             code = 130
+        finally:
+            board.stopped = True
+            ticker.join(timeout=1.0)
 
-    elapsed = time.monotonic() - started
-    if code == 0:
-        final = paint(100.0, f"done in {elapsed / 60:.1f} min")
+    elapsed = board.elapsed()
+    with write_lock:
+        if code == 0:
+            final = paint(100.0, f"done in {elapsed / 60:.1f} min", elapsed)
+            if tty:
+                sys.stdout.write("\r\x1b[2K" + final + "\n")
+            else:
+                print(final, flush=True)
+            print(f"Full build log: {log_path}", flush=True)
+            return 0
+
         if tty:
-            sys.stdout.write("\r\x1b[2K" + final + "\n")
-        else:
-            print(final, flush=True)
-        print(f"Full build log: {log_path}", flush=True)
-        return 0
-
-    if tty:
-        sys.stdout.write("\r\x1b[2K")
-    print(f"\nBuild failed after {elapsed / 60:.1f} min (exit {code}).", flush=True)
-    tail = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-TAIL_LINES:]
-    print(f"--- last {len(tail)} lines of {log_path} ---", flush=True)
-    print("\n".join(tail), flush=True)
-    return code
+            sys.stdout.write("\r\x1b[2K")
+        print(f"\nBuild failed after {elapsed / 60:.1f} min (exit {code}).", flush=True)
+        tail = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-TAIL_LINES:]
+        print(f"--- last {len(tail)} lines of {log_path} ---", flush=True)
+        print("\n".join(tail), flush=True)
+        return code
 
 
 if __name__ == "__main__":

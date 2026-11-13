@@ -58,6 +58,10 @@ The project therefore states, plainly:
 3. **No warranty.** The software is provided "as is", without warranty of any kind, as stated in the
    MIT licence. If it breaks something, the authors are not liable.
 4. **No support promise.** Issues and pull requests are answered on a best-effort, volunteer basis.
+5. **The live session's `prime` user has passwordless sudo.** That is deliberate and exists so the
+   live desktop can manage the running session; it is configured by `prime-os-live-setup` in
+   `/etc/sudoers.d/prime-live` and applies **only** to the live environment, which is never an
+   installed, permanent system.
 
 ## 4. Integrity of what you download
 
@@ -160,6 +164,9 @@ maintainer of the GitHub repository; material will be removed or corrected promp
 3. **هیچ ضمانتی وجود ندارد.** نرم‌افزار «همان‌گونه که هست» ارائه می‌شود، بدون هیچ ضمانتی، همان‌طور که
    در لایسنس MIT آمده است.
 4. **پشتیبانی تضمینی نیست.** پاسخ به issue و pull request داوطلبانه و در حد توان است.
+5. **کاربر `prime` در جلسهٔ زنده sudo بدون رمز دارد.** این عمدی است تا میزکار زنده بتواند نشست را
+   مدیریت کند؛ در `/etc/sudoers.d/prime-live` توسط `prime-os-live-setup` تنظیم می‌شود و **فقط** به
+   محیط زنده تعلق دارد که هرگز یک سیستم نصب‌شده و دائمی نیست.
 
 ### یکپارچگی چیزی که دانلود می‌کنید
 

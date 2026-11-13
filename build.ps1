@@ -12,7 +12,7 @@ if (-not (Get-Command docker.exe -ErrorAction SilentlyContinue)) {
 docker.exe info *> $null
 Require-Success 'Docker Desktop is not running. Start it, then retry.'
 
-$repoPath = (Resolve-Path $root).Path.Replace('\\', '/')
+$repoPath = (Resolve-Path $root).Path.Replace('\', '/')
 if ($repoPath -match "'") { throw 'Project paths containing a single quote are not supported by this launcher.' }
 
 $buildCommand = "pacman -Syu --noconfirm archiso && PRIME_OS_BUILD_CONTAINER=1 bash ./build.sh"

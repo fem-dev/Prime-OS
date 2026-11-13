@@ -18,11 +18,11 @@ git clone --depth 1 "${REPO_URL}" "${TMP_DIR}/repo" \
 
 mkdir -p "${APP_DIR}"
 printf '%s  %s\n' \
-    "6ab139d5981b876e57861816816ad857280afc0a7bc97f366bcc506a972b6b93" \
+    "fb2eeb35b84a56aff72ac7a33563f710cd3edcdab4ca39971bdc396229d3c319" \
     "${TMP_DIR}/repo/loader.py" | sha256sum --check --status \
     || fail "loader.py SHA-256 verification failed. The download was not installed."
 printf '%s  %s\n' \
-    "b1cf786a7c6781ea6093dc829b7d56d08b424d34c23caea3b2427101ae09eb86" \
+    "870972d63acc13b13eb2ffe44420c7e01a8366064e1ebf7ac7a6d6859ca22a36" \
     "${TMP_DIR}/repo/you.py" | sha256sum --check --status \
     || fail "you.py SHA-256 verification failed. The download was not installed."
 install -m 0644 "${TMP_DIR}/repo/loader.py" "${APP_DIR}/loader.py"
