@@ -31,10 +31,12 @@ def install_deps():
     sys.exit("Could not install: " + ", ".join(missing))
 
 
-install_deps()
+if __name__ == "__main__":        # importing this module must never install anything
+    install_deps()
 
 import time                                                      # noqa: E402
 import io                                                        # noqa: E402
+import os                                                        # noqa: E402
 import urllib.request                                            # noqa: E402
 import logging                                                   # noqa: E402
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
@@ -52,6 +54,8 @@ from contourpy import contour_generator, FillType                # noqa: E402
 BG = "#07070d"
 NG = 12                       # number of drawing layers
 MAX_SIDE = 900                # working resolution of the image
+MAX_IMAGE_BYTES = 16 * 1024 * 1024   # refuse larger inputs before decoding them
+MAX_IMAGE_PIXELS = 40_000_000
 MIN_AREA = 25                 # ignore specks smaller than this (pixels^2)
 BANDS = int(sys.argv[sys.argv.index("--bands") + 1]) if "--bands" in sys.argv else 1
 RING_PTS = 160                # max vertices per traced ring
@@ -63,9 +67,19 @@ RING_PTS = 160                # max vertices per traced ring
 def load_image(src):
     if src.startswith("http"):
         req = urllib.request.Request(src, headers={"User-Agent": "Mozilla/5.0"})
-        data = urllib.request.urlopen(req, timeout=30).read()
-        return Image.open(io.BytesIO(data)).convert("RGBA")
-    return Image.open(src).convert("RGBA")
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = response.read(MAX_IMAGE_BYTES + 1)
+        if len(data) > MAX_IMAGE_BYTES:
+            raise ValueError("Image exceeds the 16 MiB safety limit")
+        source = io.BytesIO(data)
+    else:
+        if os.path.getsize(src) > MAX_IMAGE_BYTES:
+            raise ValueError("Image exceeds the 16 MiB safety limit")
+        source = src
+    with Image.open(source) as image:
+        if image.width * image.height > MAX_IMAGE_PIXELS:
+            raise ValueError("Image exceeds the pixel limit")
+        return image.convert("RGBA")
 
 
 def make_mask(img, invert=False):
@@ -87,6 +101,8 @@ def make_mask(img, invert=False):
     m = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(
         ImageFilter.GaussianBlur(1.1))) / 255.0
     ys, xs = np.where(m > 0.5)
+    if ys.size == 0 or xs.size == 0:                # blank image, nothing to trace
+        raise ValueError("The image has no visible area to trace")
     pad = 6
     y0, y1 = max(0, ys.min() - pad), min(m.shape[0], ys.max() + pad)
     x0, x1 = max(0, xs.min() - pad), min(m.shape[1], xs.max() + pad)

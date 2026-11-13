@@ -40,7 +40,7 @@ RELEASES_API = f"https://api.github.com/repos/{REPO}/releases/latest"
 RAW_LOGO_URL = f"https://raw.githubusercontent.com/{REPO}/main/faravahar.png"
 RAW_ART_URL = f"https://raw.githubusercontent.com/{REPO}/main/you.py"
 
-ART_SHA256 = "b1cf786a7c6781ea6093dc829b7d56d08b424d34c23caea3b2427101ae09eb86"
+ART_SHA256 = "870972d63acc13b13eb2ffe44420c7e01a8366064e1ebf7ac7a6d6859ca22a36"
 LOGO_SHA256 = "7a2650c3a71e26e70def9e841bb3105756b246c9fbce64de719f0b1642fd472e"
 
 MAX_ART_BYTES = 2 * 1024 * 1024
@@ -48,6 +48,7 @@ MAX_LOGO_BYTES = 2 * 1024 * 1024
 MAX_LOGO_PIXELS = 20_000_000
 MAX_CHECKSUM_BYTES = 256 * 1024
 CHUNK_SIZE = 256 * 1024
+MAX_ISO_BYTES = 8 * 1024 ** 3     # a mirror cannot stream more than this onto the disk
 
 if os.name == "nt":
     APP_DIR = Path(
@@ -94,6 +95,21 @@ def is_allowed_github_url(url: str) -> bool:
         and parsed.hostname == "github.com"
         and parsed.path.startswith(f"/{REPO}/releases/download/")
     )
+
+
+def safe_iso_name(name: str) -> str:
+    """Reduce a release asset name to a plain file name inside the app folder.
+
+    Release metadata is remote input: a crafted or unexpected name such as
+    ``../../authorized_keys`` must never become a path on this machine.
+    """
+    candidate = Path(name).name
+    allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+    if (candidate != name or candidate.startswith(".")
+            or not candidate.lower().endswith(".iso")
+            or any(char not in allowed for char in candidate)):
+        raise ValueError(f"Unsafe or unexpected ISO asset name from GitHub: {name!r}")
+    return candidate
 
 
 def total_memory_gb() -> int:
@@ -442,7 +458,11 @@ class PrimeSetup:
         self.status.set(f"Downloading {asset.name} from the Prime-OS GitHub release…")
         self.logo_hint.configure(text="The Faravahar fills with the real download progress")
         APP_DIR.mkdir(parents=True, exist_ok=True)
-        self.download_path = APP_DIR / asset.name
+        try:
+            self.download_path = APP_DIR / safe_iso_name(asset.name)
+        except ValueError as exc:
+            self._release_missing(str(exc))
+            return
         threading.Thread(target=self._download_worker, args=(asset,), daemon=True).start()
 
     def _download_worker(self, asset: IsoAsset) -> None:
@@ -466,6 +486,11 @@ class PrimeSetup:
                             break
                         output.write(chunk)
                         downloaded += len(chunk)
+                        if downloaded > MAX_ISO_BYTES:
+                            raise IOError(
+                                f"Download exceeded the {MAX_ISO_BYTES // 1024 ** 3} GiB "
+                                "safety limit"
+                            )
                         share = downloaded / expected if expected else 0.0
                         self.root.after(0, lambda p=share: self._download_progress(p))
             if expected and downloaded != expected:

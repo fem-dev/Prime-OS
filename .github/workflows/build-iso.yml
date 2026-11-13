@@ -32,7 +32,8 @@ permissions:
 
 concurrency:
   group: iso-${{ github.ref }}
-  cancel-in-progress: false
+  # A newer commit supersedes a stale build instead of queueing behind it.
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -42,9 +43,11 @@ jobs:
       # A manual run uses the tag you type, a v* tag push uses the tag name, and a
       # push to main refreshes the rolling os-preview release.
       TAG: ${{ inputs.tag || (github.ref_type == 'tags' && github.ref_name || 'os-preview') }}
-      PRERELEASE: ${{ (inputs.prerelease == false) && '' || '--prerelease' }}
+      # 'false' is decided in the shell: an empty string is falsy in Actions
+      # expressions, so an && || chain would always add --prerelease.
+      PRERELEASE_INPUT: ${{ inputs.prerelease }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Free disk space on the runner
         run: |
@@ -53,13 +56,15 @@ jobs:
           df -h /
 
       - name: Build the live image
-        # One progress bar only; the full log is kept in build.log.
+        # One progress bar with a heartbeat; the full log is kept in build.log.
+        # mkarchiso compresses the airootfs with xz, which is the long step.
         run: |
-          python3 .github/scripts/build_iso_progress.py --log build.log -- \
-            docker run --rm --privileged \
-              -e PRIME_OS_BUILD_CONTAINER=1 \
-              -v "$PWD:/work" -w /work archlinux:latest \
-              bash -lc 'pacman -Syu --noconfirm archiso >/dev/null 2>&1 && bash ./build.sh'
+          timeout --signal=INT 100m \
+            python3 .github/scripts/build_iso_progress.py --log build.log -- \
+              docker run --rm --privileged \
+                -e PRIME_OS_BUILD_CONTAINER=1 \
+                -v "$PWD:/work" -w /work archlinux:latest \
+                bash -lc 'pacman -Syu --noconfirm archiso >/dev/null 2>&1 && bash ./build.sh'
 
       - name: Check the image
         run: |
@@ -77,7 +82,7 @@ jobs:
 
       - name: Keep the build log and image as artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: prime-os-iso
           if-no-files-found: warn
@@ -90,6 +95,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # An empty string is falsy in Actions expressions, so decide here.
+          if [ "${PRERELEASE_INPUT}" = "false" ]; then
+            prerelease=""
+          else
+            prerelease="--prerelease"
+          fi
           notes=$(cat <<'NOTES'
           Prime-OS live image, built by GitHub Actions.
 
@@ -102,6 +113,6 @@ jobs:
             gh release upload "$TAG" out/os.iso out/os.iso.sha256 --clobber
           else
             gh release create "$TAG" out/os.iso out/os.iso.sha256 \
-              --title "Prime-OS $TAG" --notes "$notes" $PRERELEASE
+              --title "Prime-OS $TAG" --notes "$notes" $prerelease
           fi
           gh release view "$TAG" --json assets --jq '.assets[].name'
