@@ -101,7 +101,7 @@ try {
         }
         if ($pass1.Length -ge 8) {
             # Check for at least one digit and one special character
-            if ($pass1 -match '[0-9]' -and $pass1 -match '[!@#$%^&*()_+\-=\[\]{};':\\|,.<>/?]') {
+            if ($pass1 -match '\d' -and $pass1 -notmatch '^[a-zA-Z0-9]+$') {
                 $passValid = $true
             } else {
                 Write-Host 'Password must contain at least one digit and one special character. Try again.' -ForegroundColor Red
