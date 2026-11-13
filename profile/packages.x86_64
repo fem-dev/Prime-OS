@@ -34,8 +34,6 @@ alsa-utils
 # --- Network ---
 networkmanager
 connman
-bluez
-bluez-utils
 
 # --- Display and fonts ---
 # Fonts (minimal set)
