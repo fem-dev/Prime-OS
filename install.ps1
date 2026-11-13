@@ -25,15 +25,19 @@ try {
 
     New-Item -ItemType Directory -Force -Path $appDir | Out-Null
     $manifest = Get-FileHash (Join-Path $temp 'repo/loader.py') -Algorithm SHA256
-    if ($manifest.Hash -ne '7C7C55DAB38EC33CC4EA1217447340C947CA316226FD605DD15CF9CD11511B18') {
+    if ($manifest.Hash -ne '6AB139D5981B876E57861816816AD857280AFC0A7BC97F366BCC506A972B6B93') {
         throw 'loader.py SHA-256 verification failed. The download was not installed.'
     }
-    Copy-Item (Join-Path $temp 'repo/loader.py') $appDir -Force
-    Copy-Item (Join-Path $temp 'repo/faravahar.png') $appDir -Force
+    $logoHash = (Get-FileHash (Join-Path $temp 'repo/faravahar.png') -Algorithm SHA256).Hash
+    if ($logoHash -ne '7A2650C3A71E26E70DEF9E841BB3105756B246C9FBCE64DE719F0B1642FD472E') {
+        throw 'faravahar.png SHA-256 verification failed. The download was not installed.'
+    }
     $artHash = (Get-FileHash (Join-Path $temp 'repo/you.py') -Algorithm SHA256).Hash
     if ($artHash -ne 'B1CF786A7C6781EA6093DC829B7D56D08B424D34C23CAEA3B2427101AE09EB86') {
         throw 'you.py SHA-256 verification failed. The download was not installed.'
     }
+    Copy-Item (Join-Path $temp 'repo/loader.py') $appDir -Force
+    Copy-Item (Join-Path $temp 'repo/faravahar.png') $appDir -Force
     Copy-Item (Join-Path $temp 'repo/you.py') $appDir -Force
     Copy-Item (Join-Path $temp 'repo/requirements.txt') $appDir -Force
 
@@ -48,6 +52,9 @@ try {
 
     & $venvPython -m pip install --disable-pip-version-check -r (Join-Path $appDir 'requirements.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Could not install the Prime-OS setup dependencies.' }
+
+    & $venvPython (Join-Path $appDir 'loader.py') --check *> $null
+    if ($LASTEXITCODE -ne 0) { throw 'The Prime-OS launcher failed its self check.' }
 
     Write-Host 'Starting Prime-OS preview setup. This does not install or replace Windows.'
     & $venvPython (Join-Path $appDir 'loader.py')

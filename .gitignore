@@ -2,3 +2,7 @@
 out/
 *.iso
 *.iso.sig
+__pycache__/
+*.py[cod]
+.venv/
+venv/
