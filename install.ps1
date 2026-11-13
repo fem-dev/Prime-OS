@@ -25,13 +25,13 @@ try {
 
     New-Item -ItemType Directory -Force -Path $appDir | Out-Null
     $manifest = Get-FileHash (Join-Path $temp 'repo/loader.py') -Algorithm SHA256
-    if ($manifest.Hash -ne '171923E0A4B92CC799E6D865BE64B8C438337B5C05731101A512ACAE52A43A2D') {
+    if ($manifest.Hash -ne '7C7C55DAB38EC33CC4EA1217447340C947CA316226FD605DD15CF9CD11511B18') {
         throw 'loader.py SHA-256 verification failed. The download was not installed.'
     }
     Copy-Item (Join-Path $temp 'repo/loader.py') $appDir -Force
     Copy-Item (Join-Path $temp 'repo/faravahar.png') $appDir -Force
     $artHash = (Get-FileHash (Join-Path $temp 'repo/you.py') -Algorithm SHA256).Hash
-    if ($artHash -ne '3C2E7A85E8AAF1FE5BB3B944E8EFB87E57A0E8B9E5CA39F64F22C5E175339676') {
+    if ($artHash -ne 'B1CF786A7C6781EA6093DC829B7D56D08B424D34C23CAEA3B2427101AE09EB86') {
         throw 'you.py SHA-256 verification failed. The download was not installed.'
     }
     Copy-Item (Join-Path $temp 'repo/you.py') $appDir -Force
