@@ -1,6 +1,6 @@
 # Prime-OS
 
-**English** · [فارسی](README.fa.md) · [العربية](README.ar.md) · [Español](README.es.md) · [Deutsch](README.de.md)
+**English** · [Français](README.fr.md) · [العربية](README.ar.md) · [Español](README.es.md) · [Deutsch](README.de.md) · [Farsi](README.fa.md) · [Italiano](README.it.md) · [Português](README.po.md) · [Русский](README.ru.md) · [中文](README.zh.md)
 
 > [!CAUTION]
 > **Read [NOTICE.md](NOTICE.md) before you download, build, mirror or redistribute anything.** Prime-OS
@@ -50,8 +50,8 @@ will not pretend to install anything.
 
 | | Windows | Linux / macOS |
 | --- | --- | --- |
-| App files | `%LOCALAPPDATA%\Prime-OS` | `~/.local/share/prime-os` |
-| Preferences | `%APPDATA%\Prime-OS\setup.json` | `~/.config/prime-os/setup.json` |
+| App files | `%LOCALAPPDATA%\\Prime-OS` | `~/.local/share/prime-os` |
+| Preferences | `%APPDATA%\\Prime-OS\\setup.json` | `~/.config/prime-os/setup.json` |
 
 ## Try the live image
 
@@ -60,7 +60,7 @@ virtual machine.
 
 ```bash
 # QEMU, read-only CD-ROM, nothing on the host is modified
-qemu-system-x86_64 -m 4G -smp 2 -cpu max -enable-kvm \
+qemu-system-x86_64 -m 4G -smp 2 -cpu max -enable-kvm \\
   -drive file=os.iso,media=cdrom,readonly=on -boot d
 ```
 
@@ -152,7 +152,9 @@ for interactive testing with the same Docker command, and the progress wrapper w
 | `profile/airootfs/` | Files placed in the live image (Hyprland, Waybar, autologin, setup) |
 | `build.sh` / `build.ps1` | Reproducible ISO build inside Docker |
 | `run-windows.sh` | Boot the built ISO in QEMU from Git Bash |
-| `requirements.txt` | Python dependency (`Pillow`) for the wizard |
+| `web_search.py` | Exa web search helper for contributors and agents (`EXA_API_KEY`) |
+| `.env.example` | Placeholder environment variables; copy it to `.env` (git-ignored) |
+| `requirements.txt` | Python dependencies (`Pillow`, `exa-py`) for the wizard and search helper |
 | `NOTICE.md` | What the project is and is not: licensing, trademarks, safety, status |
 | `.github/` | Actions workflow that builds the ISO and publishes it to releases |
 

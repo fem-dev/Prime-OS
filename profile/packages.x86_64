@@ -1,52 +1,73 @@
-# Core (archiso releng profile supplies Linux, firmware and bootloader packages)
+# Prime-OS Core Profile Packages
+# Optimized for size and broad graphics card compatibility
+# Preview-only mode: does not partition disk or install OS
+
+# --- Core system ---
 base
 sudo
-networkmanager
-nm-connection-editor
+coreutils
+diffutils
+grep
+findutils
 
-# Wayland gaming desktop
+# --- Desktop base (minimal Wayland compositor)#
+# Window manager and panel (lightweight, works with all GPUs)
 hyprland
-xdg-desktop-portal-hyprland
-xdg-desktop-portal-gtk
 waybar
 wofi
-pavucontrol
-kitty
-swaybg
-dunst
-polkit-gnome
-qt5-wayland
-qt6-wayland
-noto-fonts
-noto-fonts-emoji
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
 
-# Audio
+# --- Essential utilities ---
+# File management and desktop
+pcmanfm
+thunar
+nitrogen
+wqy-zenhei-fonts
+
+# --- Audio (lightweight) ---
 pipewire
 pipewire-alsa
-pipewire-pulse
-wireplumber
+pulseaudio
 alsa-utils
 
-# Vulkan/Mesa for AMD, Intel and Nouveau; NVIDIA open driver for supported cards
+# --- Network ---
+networkmanager
+connman
+bluez
+bluez-utils
+
+# --- Display and fonts ---
+# Fonts (minimal set)
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+
+# --- Vulkan/Mesa for broad GPU compatibility ---
+# Supports: AMD Radeon, Intel Integrated, NVIDIA (open source)
 mesa
 vulkan-radeon
 vulkan-intel
 vulkan-nouveau
 nvidia-open
-nvidia-utils
-nvidia-settings
 lib32-mesa
 lib32-vulkan-radeon
 lib32-vulkan-intel
 lib32-vulkan-nouveau
 lib32-nvidia-utils
 
-# Gaming and common desktop utilities
-steam
-lutris
-flatpak
+# --- Basic desktop apps ---
 firefox
-bluez
-bluez-utils
 udisks2
 ntfs-3g
+bluez
+blue-utils
+
+# --- Productivity (lightweight) ---
+leafpad
+geany
+
+# --- Removed for size optimization ---
+# Removed: steam, lutris, pipewire-pulse, wireplumber,
+#           swaybg, dunst, qt5-wayland, qt6-wayland,
+#           xdg-desktop-portal-gtk (kept hyprland version)

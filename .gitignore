@@ -1,8 +1,30 @@
+# Build outputs
 .build/
 out/
 *.iso
 *.iso.sig
+# Python bytecode
 __pycache__/
 *.py[cod]
+# Virtual environments
 .venv/
 venv/
+# Environment files (git-ignored, user-local)
+.env
+.env.local
+# User-specific config (not tracked)
+.env.example
+# Translated documentation (git-ignored for binary/large files)
+README.fr.md
+README.it.md
+README.po.md
+README.ru.md
+README.zh.md
+# macOS installer
+install-mac.sh
+# Windows PowerShell installer
+install.ps1
+# Installer-generated files
+*.json
+# Artifacts
+prime-os-iso
