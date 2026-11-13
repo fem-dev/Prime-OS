@@ -76,7 +76,7 @@ jobs:
         run: |
           ls -lh out/os.iso
           file out/os.iso
-          size=$(stat -c%s out/os.iso)
+          size=$(stat -c%s out/iso)
           echo "os.iso is $((size / 1024 / 1024)) MiB"
           # Verify ISO is not empty and has reasonable size (>= 100MiB, <= 2.5GiB)
           if [ "$size" -lt 104857600 ]; then
@@ -86,23 +86,6 @@ jobs:
           if [ "$size" -gt 2621440000 ]; then
             echo "::warning::ISO larger than 2.5GiB, release upload may fail due to GitHub 2GiB asset limit"
           fi
-
-      - name: Take ownership of the build output
-        # The container runs as root, so out/ is root-owned: without this the runner
-        # cannot write os.iso.sha256 next to the image.
-        run: |
-          sudo chown -R "$(id -u):$(id -g)" out .build 2>/dev/null || true
-          ls -l out/
-
-      - name: Free the build workspace
-        # .build/work holds the unpacked rootfs and the squashfs image; dropping it
-        # keeps the checksum, artifact upload and release upload from running out of disk.
-        # Only out/os.iso is still needed.
-        run: |
-          du -sh .build 2>/dev/null || true
-          # Remove .build but keep out/ directory intact
-          rm -rf .build
-          df -h /
 
       - name: Write the checksum the setup wizard verifies
         run: |
@@ -149,8 +132,9 @@ jobs:
         # Only publish to release if ISO size is within GitHub 2GiB asset limit.
         # Otherwise, skip release creation and keep artifact for manual download.
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISO_SIZE: ${{ steps.Check-the-image.outcome == 'success' && (stat -c%s out/os.iso 2>/dev/null || echo 0) || 0 }}
+          ISO_SIZE_BYTES: ${{ env.ISO_SIZE || 0 }}
+          TAG: ${{ inputs.tag || (github.ref_type == 'tags' && github.ref_name || 'os-preview') }}
+          PRERELEASE_FLAG: ""
         run: |
           # Get actual ISO size in bytes
           if [ -f out/os.iso ]; then
@@ -161,13 +145,12 @@ jobs:
           TAG="${TAG:-os-preview}"
           PRERELEASE="${PRERELEASE_INPUT:-true}"
 
-          # GitHub release asset limit is 2 GiB (2147483648 bytes)
-          MAX_ASSET_BYTES=2147483648
-          PRERELEASE_FLAG=""
-
-          if [ "$PRERELEASE_INPUT" = "false" ]; then
+          if [ "$PRERELEASE" = "false" ]; then
             PRERELEASE_FLAG="--prerelease"
           fi
+
+          # GitHub release asset limit is 2 GiB (2147483648 bytes)
+          MAX_ASSET_BYTES=2147483648
 
           if [ "$ISO_BYTES" -le "$MAX_ASSET_BYTES" ]; then
             # ISO is small enough - proceed with release creation/upload
