@@ -58,11 +58,12 @@ lib32-nvidia-utils
 firefox
 udisks2
 ntfs-3g
-bluez
+
 
 
 # --- Productivity (lightweight) ---
 geany
+
 
 # --- Removed for size optimization ---
 # Removed: steam, lutris, pipewire-pulse, wireplumber,
