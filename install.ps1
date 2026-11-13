@@ -129,7 +129,8 @@ try {
     } | ConvertTo-Json -Depth 3
 
     # Encode with Base64 (reversible but obscures plaintext in config file)
-    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($configData))
+    $configJson = $configData | ConvertTo-Json -Depth 3
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($configJson))
     Set-Content -Path $profileFile -Value $encoded -Encoding Ascii
     # Hidden, readme file for security notes
     Set-Content -Path "$profileFile.readme" -Value 'Prime-OS configuration file. Contains username and hostname. Password hash only. Do not share.' -Encoding Ascii
