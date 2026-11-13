@@ -64,7 +64,6 @@ bluez
 blue-utils
 
 # --- Productivity (lightweight) ---
-leafpad
 geany
 
 # --- Removed for size optimization ---
