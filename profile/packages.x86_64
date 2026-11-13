@@ -22,13 +22,12 @@ xdg-desktop-portal-gtk
 # File management and desktop
 pcmanfm
 thunar
-nitrogen
-
 
 # --- Audio (lightweight) ---
 pipewire
 pipewire-alsa
-pulseaudio
+alsa-utils
+pipewire-alsa
 alsa-utils
 
 # --- Network ---
