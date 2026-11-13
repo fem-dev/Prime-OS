@@ -125,6 +125,16 @@ docker run --rm --privileged \
 ویندوز به‌طور مستقیم نمی‌تواند ISO آرچ بسازد — از WSL2 با توزیع Arch یا از `build.ps1` همراه
 Docker Desktop استفاده کنید.
 
+### ساخت در CI (GitHub Actions — بدون ساخت روی سیستم خودتان)
+
+1. از تب **Actions → Build and publish ISO → Run workflow** اجرا کنید.
+2. تگ Release را وارد کنید (پیش‌فرض `os-preview`)؛ اگر نبود ساخته می‌شود.
+3. کار در یک کانتینر Docker با دسترسی privileged ساخته می‌شود، **فقط یک نوار پیشرفت** نشان می‌دهد و
+   در پایان `os.iso` و `os.iso.sha256` را روی همان Release می‌گذارد. لاگ کامل به‌عنوان artifact می‌ماند.
+
+پوش کردن یک تگ `v*` هم همین کار را می‌کند. لازم نیست چیزی روی سیستم خودتان بسازید؛ برای تست
+تعاملی هم می‌توانید در Codespace همان دستور Docker را اجرا کنید و wrapper پیشرفت آنجا هم کار می‌کند.
+
 ## ساختار مخزن
 
 | مسیر | کاربرد |
@@ -138,6 +148,7 @@ Docker Desktop استفاده کنید.
 | `build.sh` / `build.ps1` | ساخت تکرارپذیر ISO در Docker |
 | `run-windows.sh` | بوت ISO ساخته‌شده در QEMU از Git Bash |
 | `requirements.txt` | وابستگی پایتون (`Pillow`) |
+| `.github/` | workflow ساخت ISO و انتشار خودکار در Releases |
 
 جلسهٔ زنده یک‌بار و روی `tty1` توسط drop-in ورود خودکار `getty` به‌همراه `/etc/skel/.bash_profile`
 شروع می‌شود؛ `prime-os-live-setup` کاربر بدون‌ریشهٔ `prime` را می‌سازد و کانفیگ مرجع

@@ -1,0 +1,96 @@
+name: Build and publish ISO
+
+# Builds the Arch-based live image in a privileged Docker container, then uploads
+# os.iso plus os.iso.sha256 to a GitHub release. Start it from the Actions tab
+# ("Run workflow") or by pushing a v* tag.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (created if it does not exist)
+        required: true
+        default: os-preview
+      prerelease:
+        description: Mark the release as a pre-release
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: iso-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      PRERELEASE: ${{ inputs.prerelease && '--prerelease' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" 2>/dev/null || true
+          df -h /
+
+      - name: Build the live image
+        # One progress bar only; the full log is kept in build.log.
+        run: |
+          python3 .github/scripts/build_iso_progress.py --log build.log -- \
+            docker run --rm --privileged \
+              -e PRIME_OS_BUILD_CONTAINER=1 \
+              -v "$PWD:/work" -w /work archlinux:latest \
+              bash -lc 'pacman -Syu --noconfirm archiso >/dev/null 2>&1 && bash ./build.sh'
+
+      - name: Check the image
+        run: |
+          ls -lh out/os.iso
+          file out/os.iso
+          size=$(stat -c%s out/os.iso)
+          echo "os.iso is $((size / 1024 / 1024)) MiB"
+          test "$size" -gt 209715200 # refuse to publish an obviously truncated image
+
+      - name: Write the checksum the setup wizard verifies
+        run: |
+          cd out
+          sha256sum os.iso > os.iso.sha256
+          cat os.iso.sha256
+
+      - name: Keep the build log and image as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prime-os-iso
+          if-no-files-found: warn
+          path: |
+            out/os.iso
+            out/os.iso.sha256
+            build.log
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          notes=$(cat <<'NOTES'
+          Prime-OS live image, built by GitHub Actions.
+
+          Boot it in a virtual machine or write it to a spare USB drive, then verify the download:
+
+              sha256sum -c os.iso.sha256
+          NOTES
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" out/os.iso out/os.iso.sha256 --clobber
+          else
+            gh release create "$TAG" out/os.iso out/os.iso.sha256 \
+              --title "Prime-OS $TAG" --notes "$notes" $PRERELEASE
+          fi
+          gh release view "$TAG" --json assets --jq '.assets[].name'

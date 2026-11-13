@@ -125,6 +125,16 @@ temporal**, fusiona `profile/packages.x86_64` y escribe el resultado en `out/os.
 Windows no puede compilar una ISO de Arch directamente: usa WSL2 con una distribución Arch, o
 `build.ps1` con Docker Desktop.
 
+### Compilar en CI (GitHub Actions, sin compilar en tu equipo)
+
+1. Abre **Actions → Build and publish ISO → Run workflow**.
+2. Indica una etiqueta de release (por defecto `os-preview`); se crea si no existe.
+3. El trabajo compila en un contenedor Docker privilegiado, muestra **una sola barra de progreso** y
+   sube `os.iso` y `os.iso.sha256` a esa release. El log completo queda como artifact.
+
+Empujar una etiqueta `v*` hace lo mismo. No hay que compilar nada en tu máquina; un Codespace sirve
+para pruebas interactivas con el mismo comando de Docker.
+
 ## Estructura del repositorio
 
 | Ruta | Función |
@@ -138,6 +148,7 @@ Windows no puede compilar una ISO de Arch directamente: usa WSL2 con una distrib
 | `build.sh` / `build.ps1` | Compilación reproducible de la ISO con Docker |
 | `run-windows.sh` | Arranca la ISO compilada en QEMU desde Git Bash |
 | `requirements.txt` | Dependencia de Python (`Pillow`) |
+| `.github/` | Workflow de Actions que compila la ISO y la publica en las releases |
 
 La sesión en vivo se inicia una sola vez, en `tty1`, mediante el drop-in de autologin de `getty` y
 `/etc/skel/.bash_profile`; `prime-os-live-setup` crea el usuario sin privilegios `prime` e instala
