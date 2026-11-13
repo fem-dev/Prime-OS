@@ -98,7 +98,7 @@ jobs:
         # Only out/os.iso is still needed.
         run: |
           du -sh .build 2>/dev/null || true
-          rm -rf .build
+          sudo rm -rf .build 2>/dev/null || true
           df -h /
 
       - name: Write the checksum the setup wizard verifies
