@@ -15,14 +15,16 @@ trap {
 }
 
 # === Hardened configuration ===
-# Pinned source repository. If GitHub is unreachable from your network, put the
-# checkout next to this script in a folder named "repo" and run it again.
-$repo = 'https://github.com/fem-dev/Prime-OS.git'
+# Pinned source. The four files are fetched from this exact commit, never from
+# the moving "main" branch, so the hashes below always describe what arrives.
+# Refreshed together with $expectedHashes in the same commit.
+$pinnedCommit = '3c2afc643c71f0dff323849d40a719ea0f6c8ed0'
+$rawBase = "https://raw.githubusercontent.com/fem-dev/Prime-OS/$pinnedCommit"
 
 # Pinned SHA-256 of every file this installer copies. Keep in sync with
 # install.sh, install-mac.sh and loader.py whenever the sources change.
 $expectedHashes = @{
-    'loader.py'        = 'AE72B9C2220D0ED59118317CA720B324E2A14FECDE51C02386CECD16B5C88222'
+    'loader.py'        = '2A544368C4907D720761722BF2D6F48DEF54FA48C82B3C9DC1298319073B0117'
     'faravahar.png'    = '7A2650C3A71E26E70DEF9E841BB3105756B246C9FBCE64DE719F0B1642FD472E'
     'you.py'           = '870972D63ACC13B13EB2FFE44420C7E01A8366064E1EBF7AC7A6D6859CA22A36'
     'requirements.txt' = 'B4506838C7BE3C862AC0DA2886CDF9DC7DC056F8C25EDF5D47038803AC21AE9A'
@@ -81,12 +83,9 @@ New-Item -ItemType Directory -Path $temp -Force | Out-Null
 $failed = $false
 
 try {
-    Write-Step 'Prime-OS installer starting (script version 3.1)...'
+    Write-Step 'Prime-OS installer starting (script version 3.2)...'
     Write-Step "Log file: $logPath"
 
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        throw 'Git is required. Install Git for Windows, then run this command again.'
-    }
     $pythonCommand = Find-PythonCommand
     if (-not $pythonCommand) {
         throw 'Python 3 is required. Install Python 3 from python.org and enable "Add python.exe to PATH", then run this command again.'
@@ -102,9 +101,15 @@ try {
     else {
         Write-Step 'Downloading Prime-OS setup files from GitHub...'
         $sourceDir = Join-Path $temp 'repo'
-        git -c core.autocrlf=false -c core.eol=lf clone --depth 1 $repo $sourceDir
-        if ($LASTEXITCODE -ne 0) {
-            throw 'Could not download the Prime-OS repository. Check your internet connection, then try again. If GitHub is blocked on your network, connect a VPN and retry, or disconnect the VPN and retry.'
+        New-Item -ItemType Directory -Path $sourceDir -Force | Out-Null
+        foreach ($name in $expectedHashes.Keys) {
+            $url = "$rawBase/$name"
+            try {
+                Invoke-WebRequest -Uri $url -OutFile (Join-Path $sourceDir $name) -UseBasicParsing -TimeoutSec 90
+            }
+            catch {
+                throw "Could not download $name from GitHub. Check your internet connection, then try again. If GitHub is blocked on your network, turn a VPN on and retry, or turn an existing VPN off and retry."
+            }
         }
     }
 
