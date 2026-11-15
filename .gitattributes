@@ -1,0 +1,8 @@
+# Keep the bytes of every source file identical on every platform.
+# Windows Git installs default to core.autocrlf=true, which rewrites LF to CRLF
+# on checkout and changes the SHA-256 that the installers verify.
+* text=auto eol=lf
+*.png binary
+*.iso binary
+*.jpg binary
+*.ico binary

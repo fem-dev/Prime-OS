@@ -2,6 +2,18 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 $ProgressPreference = 'SilentlyContinue'
 
+# A red line and a vanishing window is useless. Any terminating error that escapes
+# the main try/catch still prints the reason and waits before the host is closed.
+$script:HasFailed = $false
+trap {
+    $script:HasFailed = $true
+    Write-Host ''
+    Write-Host "Installer stopped: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host 'Run the command again with the safe wrapper from the README to keep this window open.' -ForegroundColor Yellow
+    if ($Host.Name -eq 'ConsoleHost') { $null = Read-Host 'Press Enter to close' }
+    exit 1
+}
+
 # === Hardened configuration ===
 # Pinned source repository. If GitHub is unreachable from your network, put the
 # checkout next to this script in a folder named "repo" and run it again.
@@ -25,15 +37,37 @@ function Write-Step {
     try { Add-Content -Path $logPath -Value ("[{0}] {1}" -f (Get-Date).ToString('u'), $Message) -ErrorAction SilentlyContinue } catch { }
 }
 
+function Get-Sha256Hex {
+    param([byte[]]$Bytes)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($Bytes)) -replace '-', '').ToLowerInvariant() }
+    finally { $sha.Dispose() }
+}
+
 function Assert-FileHash {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$Expected
     )
-    $actual = (Get-FileHash -Path $Path -Algorithm SHA256).Hash
-    if ($actual -ne $Expected) {
-        throw "$([System.IO.Path]::GetFileName($Path)) SHA-256 verification failed. The download was not installed. Hash mismatch detected."
+    $expectedLower = $Expected.ToLowerInvariant()
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ((Get-Sha256Hex -Bytes $bytes) -eq $expectedLower) { return }
+
+    # Windows Git may have checked the file out with CRLF line endings
+    # (core.autocrlf=true), which changes the SHA-256 without changing the file.
+    # Normalise to LF, verify that, and keep the normalised copy on disk.
+    $extension = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
+    if ($extension -in '.py', '.txt', '.md', '.sh', '.json') {
+        $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+        $normalised = [System.Text.Encoding]::UTF8.GetBytes(($text -replace "`r`n", "`n"))
+        if ((Get-Sha256Hex -Bytes $normalised) -eq $expectedLower) {
+            [System.IO.File]::WriteAllBytes($Path, $normalised)
+            Write-Step "Note: converted $([System.IO.Path]::GetFileName($Path)) from CRLF to LF to match the published SHA-256."
+            return
+        }
     }
+
+    throw "$([System.IO.Path]::GetFileName($Path)) SHA-256 verification failed. The download was not installed. Hash mismatch detected."
 }
 
 function Find-PythonCommand {
@@ -47,7 +81,7 @@ New-Item -ItemType Directory -Path $temp -Force | Out-Null
 $failed = $false
 
 try {
-    Write-Step 'Prime-OS installer starting...'
+    Write-Step 'Prime-OS installer starting (script version 3.1)...'
     Write-Step "Log file: $logPath"
 
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -68,7 +102,7 @@ try {
     else {
         Write-Step 'Downloading Prime-OS setup files from GitHub...'
         $sourceDir = Join-Path $temp 'repo'
-        git clone --depth 1 $repo $sourceDir
+        git -c core.autocrlf=false -c core.eol=lf clone --depth 1 $repo $sourceDir
         if ($LASTEXITCODE -ne 0) {
             throw 'Could not download the Prime-OS repository. Check your internet connection, then try again. If GitHub is blocked on your network, connect a VPN and retry, or disconnect the VPN and retry.'
         }
@@ -212,7 +246,7 @@ finally {
     Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
     # Keep the window open when the script runs in its own console, and show the
     # real reason instead of closing silently (the old exit 1 closed the window).
-    if ($failed -and $Host.Name -eq 'ConsoleHost') {
+    if ($failed -and $Host.Name -eq 'ConsoleHost' -and -not $env:PRIME_OS_NO_PAUSE) {
         Write-Host ''
         Write-Host 'Press Enter to close this window...' -ForegroundColor Gray
         $null = Read-Host

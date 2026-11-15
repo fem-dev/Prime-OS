@@ -20,9 +20,20 @@ fail() { printf '\nPrime-OS setup: %s\n' "$*" >&2; exit 1; }
 # Secure hash verification function
 verify_sha256() {
     local file="$1" expected="$2"
-    if ! sha256sum --check --status <<< "${expected}  ${file}" 2>/dev/null; then
-        fail "SHA-256 verification failed for: ${file}"
+    if sha256sum --check --status <<< "${expected}  ${file}" 2>/dev/null; then
+        return 0
     fi
+    # A checkout made with core.autocrlf=true has CRLF line endings, which
+    # changes the SHA-256 without changing the file. Normalise to LF and retry.
+    local normalised="${file}.lf"
+    if sed 's/\r$//' "${file}" > "${normalised}" 2>/dev/null \
+        && sha256sum --check --status <<< "${expected}  ${normalised}" 2>/dev/null; then
+        mv "${normalised}" "${file}"
+        printf 'Note: converted %s from CRLF to LF to match the published SHA-256.\n' "$(basename "${file}")"
+        return 0
+    fi
+    rm -f "${normalised}"
+    fail "SHA-256 verification failed for: ${file}"
 }
 
 # === Core requirements ===
@@ -31,7 +42,7 @@ command -v python3 >/dev/null 2>&1 || fail "Python 3 is required. Install Python
 
 # === Download and verify ===
 printf 'Downloading the Prime-OS launcher from GitHub…\n'
-git clone --depth 1 "${REPO_URL}" "${TMP_DIR}/repo" \
+git -c core.autocrlf=false -c core.eol=lf clone --depth 1 "${REPO_URL}" "${TMP_DIR}/repo" \
     || fail "Could not clone ${REPO_URL}. Check your internet connection."
 
 mkdir -p "${APP_DIR}"
