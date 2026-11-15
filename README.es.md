@@ -26,7 +26,7 @@ descarga: un 1 % descargado es un 1 % del dibujo.
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/8ba7f8206443b75f8f9113072867724edcb7b549/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/25aa65ac8e7cb6ef35dc0d4b62ffe0df0b77f917/install.ps1 | iex
 ```
 
 > [!TIP]
