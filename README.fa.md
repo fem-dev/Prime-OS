@@ -24,8 +24,17 @@ Release مخزن گیت‌هاب دانلود می‌کند .
 ### ویندوز
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/fd3cc79af467efa823645f73f2c3afad98529e10/install.ps1 | iex
 ```
+
+> [!TIP]
+> **اگر دستور ویندوز با خطای شبکه متوقف شد** (`Unable to connect to the remote server`،
+> `Could not connect to server` یا timeout)، مشکل از اتصال به گیت‌هاب است، نه از اسکریپت:
+> **VPN را روشن کنید و همان دستور را دوباره اجرا کنید**. اگر VPN روشن است و باز هم خطا داد،
+> **VPN را خاموش کنید** (یا سرور دیگری انتخاب کنید) و دوباره امتحان کنید — بعضی VPNها، فیلترهای
+> DNS و شبکه‌های اداری دسترسی به `raw.githubusercontent.com` و `github.com` را می‌بندند. بعد در
+> مرورگر `https://github.com` را باز کنید تا از وصل بودن اینترنت مطمئن شوید و همان دستور را
+> دوباره اجرا کنید.
 
 ### لینوکس و مک
 
