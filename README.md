@@ -26,7 +26,7 @@ progress — one percent downloaded is one percent of the drawing.
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/61033c2a2ee50b6161a7fecfe38e6e3dbdd8feb9/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/8ba7f8206443b75f8f9113072867724edcb7b549/install.ps1 | iex
 ```
 
 > [!TIP]
