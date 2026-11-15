@@ -26,8 +26,17 @@ descarga: un 1 % descargado es un 1 % del dibujo.
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/fd3cc79af467efa823645f73f2c3afad98529e10/install.ps1 | iex
 ```
+
+> [!TIP]
+> **Si el comando de Windows falla con un error de red** (`Unable to connect to the remote
+> server`, `Could not connect to server` o un tiempo de espera agotado), el problema es la
+> conexión con GitHub, no el script: **activa una VPN y vuelve a ejecutar el mismo comando**. Si
+> ya hay una VPN activa y sigue fallando, **desactiva la VPN** (o cambia de servidor) y reintenta
+> — algunas VPN, filtros de DNS y redes corporativas bloquean `raw.githubusercontent.com` y
+> `github.com`. Después abre `https://github.com` en el navegador para confirmar la conexión y
+> ejecuta el comando otra vez.
 
 ### Linux y macOS
 

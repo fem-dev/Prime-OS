@@ -24,8 +24,16 @@
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/fd3cc79af467efa823645f73f2c3afad98529e10/install.ps1 | iex
 ```
+
+> [!TIP]
+> **إذا فشل الأمر على Windows بخطأ في الشبكة** (`Unable to connect to the remote server`،
+> `Could not connect to server` أو انتهاء المهلة)، فالمشكلة في الاتصال بـ GitHub وليست في
+> السكربت: **شغّل VPN ثم أعد تنفيذ الأمر نفسه**. وإذا كان VPN مشتغلًا وما زال الفشل مستمرًا،
+> **أوقف VPN** (أو غيّر الخادم) وحاول مرة أخرى — بعض خدمات VPN ومرشّحات DNS وشبكات الشركات
+> تحجب `raw.githubusercontent.com` و`github.com`. تأكد بعدها من فتح `https://github.com` في
+> المتصفح، ثم أعد تنفيذ الأمر.
 
 ### Linux و macOS
 
