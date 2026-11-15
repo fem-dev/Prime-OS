@@ -27,7 +27,7 @@ Download ist ein Prozent der Zeichnung.
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/25aa65ac8e7cb6ef35dc0d4b62ffe0df0b77f917/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/3d2552f4f7d6bc380780474dc1dc195625f68889/install.ps1 | iex
 ```
 
 > [!TIP]
