@@ -17,7 +17,7 @@
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/fd3cc79af467efa823645f73f2c3afad98529e10/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/f4f3ca5675a272023bdf52a232422fa00a2a86fe/install.ps1 | iex
 ```
 
 > [!TIP]
