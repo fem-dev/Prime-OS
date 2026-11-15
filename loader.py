@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Prime-OS setup wizard and live-image downloader.
 
-The wizard downloads the published Prime-OS live image (``os.iso``) from the
-project's GitHub releases and fills the Faravahar artwork in step with the real
-byte progress: one percent of the download is one percent of the drawing.
+The wizard asks which download source you want (GitHub in the USA, an optional
+Iranian mirror, or an automatic "best location" probe), downloads the published
+Prime-OS live image (``os.iso``), and fills the Faravahar artwork in step with
+the real byte progress: one percent of the download is one percent of the
+drawing.
 
 It never repartitions a disk, writes a USB drive or installs an operating
 system, and it never executes the bundled ``you.py`` artwork module.
@@ -17,9 +19,11 @@ import io
 import json
 import os
 import platform
+import socket
 import subprocess
 import sys
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -65,10 +69,14 @@ else:
 
 BG = "#090d18"
 PANEL = "#121a2a"
+PANEL_ACTIVE = "#1c2740"
+BORDER = "#22304a"
+BORDER_ACTIVE = "#a78bfa"
 ACCENT = "#a78bfa"
 GOLD = "#f2bb54"
 TEXT = "#f4f5fb"
 MUTED = "#a0abc0"
+GHOST = "#2c3852"
 
 CHECKSUM_ASSET_NAMES = ("sha256sums.txt", "sha256sums", "checksums.txt", "sha256.txt")
 
@@ -83,6 +91,41 @@ class IsoAsset:
     checksum_url: str | None = None
 
 
+@dataclass(frozen=True)
+class Source:
+    """A place the image can be downloaded from."""
+
+    key: str
+    title: str
+    detail: str
+    mirror_base: str | None = None   # None means "use the GitHub release URL"
+
+
+def mirror_from_environment() -> str | None:
+    """Optional mirror for the Iran entry, e.g. https://mirror.example.net/prime-os."""
+    value = os.environ.get("PRIME_OS_MIRROR_IRAN", "").strip().rstrip("/")
+    if not value:
+        return None
+    parsed = urllib.parse.urlparse(value)
+    if parsed.scheme != "https" or not parsed.hostname:
+        return None
+    return value
+
+
+def build_sources() -> list[Source]:
+    mirror = mirror_from_environment()
+    iran_detail = (
+        f"Iran · mirror {urllib.parse.urlparse(mirror).hostname}"
+        if mirror
+        else "Iran · set PRIME_OS_MIRROR_IRAN to use a local mirror (falls back to GitHub)"
+    )
+    return [
+        Source("usa", "USA · GitHub releases", "Direct download from github.com (default)", None),
+        Source("iran", "Iran · community mirror", iran_detail, mirror),
+        Source("best", "Best location · fastest ping", "Measures both hosts and picks the quicker one", None),
+    ]
+
+
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -94,6 +137,17 @@ def is_allowed_github_url(url: str) -> bool:
         parsed.scheme == "https"
         and parsed.hostname == "github.com"
         and parsed.path.startswith(f"/{REPO}/releases/download/")
+    )
+
+
+def is_allowed_mirror_url(url: str, mirror_base: str) -> bool:
+    """A mirror may only serve HTTPS from its own host, using the same path."""
+    parsed = urllib.parse.urlparse(url)
+    base = urllib.parse.urlparse(mirror_base)
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname == base.hostname
+        and parsed.path.startswith("/")
     )
 
 
@@ -156,6 +210,31 @@ def gpu_name() -> str:
     return "GPU not detected automatically"
 
 
+def tcp_latency_ms(host: str, port: int = 443, attempts: int = 2) -> float | None:
+    """Median TCP connect time in milliseconds, or None when the host is unreachable."""
+    samples: list[float] = []
+    for _ in range(attempts):
+        started = time.perf_counter()
+        try:
+            with socket.create_connection((host, port), timeout=4):
+                pass
+        except OSError:
+            continue
+        samples.append((time.perf_counter() - started) * 1000.0)
+    if not samples:
+        return None
+    samples.sort()
+    return samples[len(samples) // 2]
+
+
+def mirror_url_for(asset_url: str, mirror_base: str) -> str:
+    """Reuse the release path on the mirror host: /releases/download/<tag>/<file>."""
+    parsed = urllib.parse.urlparse(asset_url)
+    return urllib.parse.urlunparse(
+        (parsed.scheme, urllib.parse.urlparse(mirror_base).netloc, parsed.path, "", "", "")
+    )
+
+
 def pick_iso_asset(release: dict) -> IsoAsset | None:
     """Choose the live image from a release payload.
 
@@ -206,15 +285,25 @@ def expected_digest(checksum_text: str, filename: str) -> str | None:
     return None
 
 
+def human_size(num_bytes: float) -> str:
+    units = ("B", "KiB", "MiB", "GiB", "TiB")
+    value = float(max(0, num_bytes))
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} {unit}"
+        value /= 1024
+    return f"{value:.1f} TiB"
+
+
 class PrimeSetup:
-    """Single-window wizard: download the image, then save a hardware profile."""
+    """Single-window wizard: choose a source, download, then save a profile."""
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Prime-OS · Setup")
         self.root.configure(bg=BG)
-        self.root.geometry("760x700")
-        self.root.minsize(620, 620)
+        self.root.geometry("780x760")
+        self.root.minsize(660, 700)
 
         available_fonts = set(self.root.tk.call("font", "families"))
         self.ui_font = next(
@@ -228,16 +317,35 @@ class PrimeSetup:
         self.ram_choice = tk.IntVar(value=max(1, min(4, self.max_ram - 1)))
         self.gpu_choice = tk.IntVar(value=50)
         self.progress_value = tk.DoubleVar(value=0)
-        self.status = tk.StringVar(value="Connecting to the Prime-OS GitHub releases…")
-        self.logo_source: Image.Image | None = None
-        self.logo_photo: ImageTk.PhotoImage | None = None
+        self.status = tk.StringVar(value="Choose where to download Prime-OS from.")
+        self.sources = build_sources()
+        self.source_index = 0
+        self.source_rows: list[tk.Frame] = []
+        self.source_titles: list[tk.Label] = []
+        self.source_details: list[tk.Label] = []
+        self.release: dict | None = None
+        self.release_checked = False
         self.download_path: Path | None = None
         self.download_finished = False
         self.download_verified = False
+        self.logo_source: Image.Image | None = None
+        self.logo_ghost: Image.Image | None = None
+        self.logo_photo: ImageTk.PhotoImage | None = None
+        self.logo_width = 0
+        self.logo_height = 0
 
         self._style()
         self._build_loader()
-        threading.Thread(target=self._check_release_worker, daemon=True).start()
+        self.root.bind("<Up>", lambda _event: self._move_source(-1))
+        self.root.bind("<Down>", lambda _event: self._move_source(1))
+        self.root.bind("<Left>", lambda _event: self._move_source(-1))
+        self.root.bind("<Right>", lambda _event: self._move_source(1))
+        self.root.bind("<Return>", lambda _event: self._start_clicked())
+        self.root.bind("<KP_Enter>", lambda _event: self._start_clicked())
+        self.root.bind("<space>", lambda _event: self._start_clicked())
+        self.root.bind("<Escape>", lambda _event: self.root.destroy())
+        for number in (1, 2, 3):
+            self.root.bind(str(number), lambda _event, index=number - 1: self._select_source(index))
 
     # -- styling ---------------------------------------------------------
     def _style(self) -> None:
@@ -256,50 +364,118 @@ class PrimeSetup:
 
     # -- download screen -------------------------------------------------
     def _build_loader(self) -> None:
-        wrapper = tk.Frame(self.root, bg=BG, padx=34, pady=24)
+        wrapper = tk.Frame(self.root, bg=BG, padx=34, pady=20)
         wrapper.pack(fill="both", expand=True)
         tk.Label(
             wrapper, text="PRIME-OS", fg=TEXT, bg=BG, font=(self.ui_font, 25, "bold")
-        ).pack(pady=(8, 2))
+        ).pack(pady=(4, 2))
         tk.Label(
             wrapper, text="GAMING SYSTEM · EARLY PREVIEW", fg=ACCENT, bg=BG,
             font=(self.ui_font, 9, "bold"),
-        ).pack(pady=(0, 12))
+        ).pack(pady=(0, 10))
 
-        self.logo_label = tk.Label(wrapper, bg=BG)
-        self.logo_label.pack(pady=4)
+        self.logo_label = tk.Label(wrapper, bg=BG, height=6)
+        self.logo_label.pack(pady=2)
         self.logo_hint = tk.Label(
-            wrapper, text="Loading you.py artwork module…", fg=MUTED, bg=BG,
+            wrapper, text="Loading the Faravahar artwork…", fg=MUTED, bg=BG,
             font=(self.ui_font, 9),
         )
-        self.logo_hint.pack(pady=(0, 8))
+        self.logo_hint.pack(pady=(0, 10))
 
         self.progress = ttk.Progressbar(
             wrapper, style="Prime.Horizontal.TProgressbar", mode="determinate",
             maximum=100, variable=self.progress_value,
         )
-        self.progress.pack(fill="x", padx=26, pady=(10, 6))
+        self.progress.pack(fill="x", padx=26, pady=(4, 8))
         tk.Label(
-            wrapper, textvariable=self.status, fg=TEXT, bg=BG, wraplength=620,
+            wrapper, textvariable=self.status, fg=TEXT, bg=BG, wraplength=640,
             justify="center",
-        ).pack(pady=(4, 12))
+        ).pack(pady=(2, 10))
 
-        self.continue_button = tk.Button(
-            wrapper, text="Continue to setup", command=self._build_preferences,
+        tk.Label(
+            wrapper, text="DOWNLOAD SOURCE", fg=MUTED, bg=BG,
+            font=(self.ui_font, 8, "bold"),
+        ).pack(anchor="w", padx=26, pady=(4, 4))
+
+        source_box = tk.Frame(wrapper, bg=BG)
+        source_box.pack(fill="x", padx=26)
+        for index, source in enumerate(self.sources):
+            self._build_source_row(source_box, index, source)
+
+        tk.Label(
+            wrapper,
+            text="Use ↑ ↓ (or 1–3) to select · Enter to start · Esc to quit",
+            fg=MUTED, bg=BG, font=(self.ui_font, 8),
+        ).pack(pady=(8, 10))
+
+        buttons = tk.Frame(wrapper, bg=BG)
+        buttons.pack(pady=(0, 6))
+        self.start_button = tk.Button(
+            buttons, text="Start download", command=self._start_clicked,
             bg="#6845c5", fg="white", activebackground="#8060df",
             activeforeground="white", disabledforeground="#748099", relief="flat",
-            padx=22, pady=10, state="disabled",
+            padx=22, pady=10,
         )
-        self.continue_button.pack(pady=8)
+        self.start_button.pack(side="left", padx=6)
+        self.continue_button = tk.Button(
+            buttons, text="Continue to setup", command=self._build_preferences,
+            bg=PANEL, fg=TEXT, activebackground=PANEL_ACTIVE, activeforeground=TEXT,
+            disabledforeground="#748099", relief="flat", padx=22, pady=10,
+            state="disabled",
+        )
+        self.continue_button.pack(side="left", padx=6)
+
         tk.Label(
             wrapper,
             text="Preview only: this app never flashes a USB, changes partitions, "
                  "or installs over your OS.",
-            fg=MUTED, bg=BG, wraplength=620, justify="center", font=(self.ui_font, 9),
-        ).pack(side="bottom", pady=(12, 0))
+            fg=MUTED, bg=BG, wraplength=640, justify="center", font=(self.ui_font, 9),
+        ).pack(side="bottom", pady=(10, 0))
 
         self._load_logo()
         threading.Thread(target=self._load_art_module, daemon=True).start()
+        self._render_sources()
+
+    def _build_source_row(self, parent: tk.Frame, index: int, source: Source) -> None:
+        row = tk.Frame(
+            parent, bg=PANEL, highlightthickness=1, highlightbackground=BORDER,
+            padx=14, pady=9,
+        )
+        row.pack(fill="x", pady=3)
+        title = tk.Label(
+            row, text=f"{index + 1}. {source.title}", fg=TEXT, bg=PANEL,
+            font=(self.ui_font, 11, "bold"), anchor="w",
+        )
+        title.pack(fill="x")
+        detail = tk.Label(
+            row, text=source.detail, fg=MUTED, bg=PANEL, anchor="w",
+            justify="left", wraplength=600, font=(self.ui_font, 9),
+        )
+        detail.pack(fill="x", pady=(2, 0))
+        for widget in (row, title, detail):
+            widget.bind("<Button-1>", lambda _event, i=index: self._select_source(i))
+        self.source_rows.append(row)
+        self.source_titles.append(title)
+        self.source_details.append(detail)
+
+    def _render_sources(self) -> None:
+        for index, row in enumerate(self.source_rows):
+            active = index == self.source_index
+            background = PANEL_ACTIVE if active else PANEL
+            border = BORDER_ACTIVE if active else BORDER
+            row.configure(bg=background, highlightbackground=border, highlightthickness=2 if active else 1)
+            self.source_titles[index].configure(bg=background, fg=TEXT if active else "#c9d2e3")
+            self.source_details[index].configure(bg=background, fg=TEXT if active else MUTED)
+
+    def _move_source(self, delta: int) -> None:
+        self._select_source((self.source_index + delta) % len(self.sources))
+
+    def _select_source(self, index: int) -> None:
+        if not 0 <= index < len(self.sources):
+            return
+        self.source_index = index
+        self._render_sources()
+        self.status.set(f"Download source: {self.sources[index].title}")
 
     # -- artwork ---------------------------------------------------------
     def _load_art_module(self) -> None:
@@ -354,10 +530,9 @@ class PrimeSetup:
 
         if self.logo_source is None:
             self.logo_hint.configure(text="Loading Faravahar artwork from GitHub…")
-            self.status.set("Faravahar artwork is missing; downloading it from GitHub…")
             threading.Thread(target=self._download_logo_worker, daemon=True).start()
         else:
-            self._show_logo(0.0)
+            self._prepare_logo()
 
     def _download_logo_worker(self) -> None:
         try:
@@ -384,32 +559,51 @@ class PrimeSetup:
 
     def _set_downloaded_logo(self, image: Image.Image) -> None:
         self.logo_source = image
+        self._prepare_logo()
+
+    def _prepare_logo(self) -> None:
+        """Cache the dim outline and the gold ink mask at the display size."""
+        if self.logo_source is None:
+            return
+        image = self.logo_source.copy()
+        image.thumbnail((560, 280), Image.Resampling.LANCZOS)
+        self.logo_width, self.logo_height = image.size
+        ink_alpha = ImageChops.multiply(
+            image.getchannel("A"), ImageOps.invert(ImageOps.grayscale(image))
+        )
+        ghost = Image.new("RGBA", image.size, (150, 163, 189, 255))
+        ghost.putalpha(ink_alpha.point(lambda value: int(value * 0.30)))
+        self.logo_ghost = ghost
+        self.ink_alpha = ink_alpha
         self._show_logo(0.0)
 
     def _show_logo(self, fraction: float) -> None:
-        """Reveal the artwork left to right, exactly in step with the download.
+        """Draw the Faravahar: a visible outline, filled with gold as bytes arrive.
 
         ``fraction`` is the real downloaded share (0.0–1.0), so the coloured
         width of the drawing always equals the downloaded percentage.
         """
-        if self.logo_source is None:
+        if self.logo_source is None or getattr(self, "logo_ghost", None) is None:
             return
-        image = self.logo_source.copy()
-        image.thumbnail((540, 270), Image.Resampling.LANCZOS)
-        width, height = image.size
+        width, height = self.logo_width, self.logo_height
         cutoff = max(0, min(width, int(round(width * max(0.0, min(1.0, fraction))))))
-        # Pillow's native channel operations keep the animation smooth at 30 fps.
-        ink_alpha = ImageChops.multiply(
-            image.getchannel("A"), ImageOps.invert(ImageOps.grayscale(image))
-        )
-        if cutoff < width:
-            ink_alpha.paste(0, (cutoff, 0, width, height))
-        gold = Image.new("RGBA", image.size, (255, 184, 58, 255))
-        gold.putalpha(ink_alpha)
-        self.logo_photo = ImageTk.PhotoImage(gold)
+        canvas = self.logo_ghost.copy()
+        if cutoff > 0:
+            gold = Image.new("RGBA", (cutoff, height), (255, 184, 58, 255))
+            gold.putalpha(self.ink_alpha.crop((0, 0, cutoff, height)))
+            canvas.alpha_composite(gold, (0, 0))
+        self.logo_photo = ImageTk.PhotoImage(canvas)
         self.logo_label.configure(image=self.logo_photo)
 
     # -- GitHub release --------------------------------------------------
+    def _start_clicked(self) -> None:
+        """Enter/space launches the selected source, then the release check."""
+        if str(self.start_button["state"]) == "disabled":
+            return
+        self.start_button.configure(state="disabled")
+        self.status.set(f"Contacting GitHub through {self.sources[self.source_index].title}…")
+        threading.Thread(target=self._check_release_worker, daemon=True).start()
+
     def _check_release_worker(self) -> None:
         request = urllib.request.Request(
             RELEASES_API,
@@ -418,6 +612,8 @@ class PrimeSetup:
         try:
             with urllib.request.urlopen(request, timeout=20) as response:
                 release = json.load(response)
+            self.release = release
+            self.release_checked = True
             asset = pick_iso_asset(release)
             if asset is None:
                 self.root.after(0, lambda: self._release_missing(
@@ -425,7 +621,8 @@ class PrimeSetup:
                     "preview mode; it will not pretend to install an OS."
                 ))
                 return
-            self.root.after(0, lambda: self._start_download(asset))
+            source = self.sources[self.source_index]
+            self.root.after(0, lambda: self._start_download(asset, source))
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 message = (
@@ -435,27 +632,66 @@ class PrimeSetup:
             elif exc.code == 403:
                 message = (
                     "GitHub refused the release check (HTTP 403, likely a rate limit). "
-                    "Retry in a few minutes or download os.iso from the releases page."
+                    "Retry in a few minutes, or pick the Iran mirror in the source list."
                 )
             else:
                 message = (
                     f"GitHub release check failed (HTTP {exc.code}). You can retry by "
-                    "reopening the setup."
+                    "pressing Start download again."
                 )
             self.root.after(0, lambda: self._release_missing(message))
         except Exception as exc:  # noqa: BLE001 - surfaced in the window
             self.root.after(0, lambda error=str(exc): self._release_missing(
-                f"Could not reach GitHub: {error}. Check your internet connection and try again."
+                f"Could not reach GitHub: {error}. Check your internet connection, then try "
+                "a VPN, or turn an existing VPN off."
             ))
 
     def _release_missing(self, message: str) -> None:
         self.status.set(message)
         self.logo_hint.configure(text="No ISO available — preview setup only")
         self.progress_value.set(0)
+        self.start_button.configure(state="normal", text="Retry download")
         self.continue_button.configure(state="normal")
+        self._render_sources()
 
-    def _start_download(self, asset: IsoAsset) -> None:
-        self.status.set(f"Downloading {asset.name} from the Prime-OS GitHub release…")
+    def _resolve_source(self, asset: IsoAsset, source: Source) -> tuple[str, str | None, str]:
+        """Return (image_url, checksum_url, human label) for the chosen source."""
+        if source.key == "iran" and source.mirror_base:
+            return (
+                mirror_url_for(asset.url, source.mirror_base),
+                mirror_url_for(asset.checksum_url, source.mirror_base) if asset.checksum_url else None,
+                "the Iran mirror",
+            )
+        if source.key == "iran" and not source.mirror_base:
+            return asset.url, asset.checksum_url, "GitHub (no Iran mirror is configured)"
+
+        if source.key == "best" and source.mirror_base is None and mirror_from_environment():
+            mirror = mirror_from_environment()
+            github_ms = tcp_latency_ms("github.com")
+            mirror_ms = tcp_latency_ms(urllib.parse.urlparse(mirror).hostname)
+            if mirror_ms is not None and (github_ms is None or mirror_ms < github_ms):
+                return (
+                    mirror_url_for(asset.url, mirror),
+                    mirror_url_for(asset.checksum_url, mirror) if asset.checksum_url else None,
+                    f"the Iran mirror ({mirror_ms:.0f} ms vs GitHub "
+                    f"{'unreachable' if github_ms is None else f'{github_ms:.0f} ms'})",
+                )
+            if github_ms is not None:
+                return asset.url, asset.checksum_url, f"GitHub ({github_ms:.0f} ms)"
+        if source.key == "best":
+            github_ms = tcp_latency_ms("github.com")
+            if github_ms is None:
+                return asset.url, asset.checksum_url, "GitHub (no faster host responded)"
+            return asset.url, asset.checksum_url, f"GitHub ({github_ms:.0f} ms, only host configured)"
+        return asset.url, asset.checksum_url, "GitHub"
+
+    def _start_download(self, asset: IsoAsset, source: Source) -> None:
+        try:
+            image_url, checksum_url, label = self._resolve_source(asset, source)
+        except Exception as exc:  # noqa: BLE001 - surfaced in the window
+            self._release_missing(f"Could not prepare the download: {exc}")
+            return
+        self.status.set(f"Downloading {asset.name} from {label}…")
         self.logo_hint.configure(text="The Faravahar fills with the real download progress")
         APP_DIR.mkdir(parents=True, exist_ok=True)
         try:
@@ -463,17 +699,26 @@ class PrimeSetup:
         except ValueError as exc:
             self._release_missing(str(exc))
             return
-        threading.Thread(target=self._download_worker, args=(asset,), daemon=True).start()
+        threading.Thread(
+            target=self._download_worker,
+            args=(asset, image_url, checksum_url, source),
+            daemon=True,
+        ).start()
 
-    def _download_worker(self, asset: IsoAsset) -> None:
+    def _download_worker(
+        self, asset: IsoAsset, image_url: str, checksum_url: str | None, source: Source
+    ) -> None:
         destination = self.download_path
         assert destination is not None
         temporary = destination.with_suffix(destination.suffix + ".part")
         try:
-            if not is_allowed_github_url(asset.url):
+            if source.key == "iran" and source.mirror_base:
+                if not is_allowed_mirror_url(image_url, source.mirror_base):
+                    raise ValueError("Mirror URL is not the configured Prime-OS HTTPS mirror")
+            elif not is_allowed_github_url(image_url):
                 raise ValueError("GitHub release asset URL is not an allowed Prime-OS HTTPS URL")
             request = urllib.request.Request(
-                asset.url,
+                image_url,
                 headers={"User-Agent": "Prime-OS-Setup", "Accept": "application/octet-stream"},
             )
             with urllib.request.urlopen(request, timeout=30) as response:
@@ -492,10 +737,12 @@ class PrimeSetup:
                                 "safety limit"
                             )
                         share = downloaded / expected if expected else 0.0
-                        self.root.after(0, lambda p=share: self._download_progress(p))
+                        self.root.after(
+                            0, lambda p=share, d=downloaded, t=expected: self._download_progress(p, d, t)
+                        )
             if expected and downloaded != expected:
                 raise IOError(f"Incomplete download: received {downloaded} of {expected} bytes")
-            self._verify_checksum(temporary, asset)
+            self._verify_checksum(temporary, asset, checksum_url)
             os.replace(temporary, destination)
             self.root.after(0, lambda: self._download_complete(asset))
         except Exception as exc:  # noqa: BLE001 - surfaced in the window
@@ -504,18 +751,25 @@ class PrimeSetup:
             except OSError:
                 pass
             self.root.after(0, lambda error=str(exc): self._release_missing(
-                f"ISO download failed: {error}"
+                f"ISO download failed: {error}. Try another download source."
             ))
 
-    def _verify_checksum(self, path: Path, asset: IsoAsset) -> None:
+    def _verify_checksum(self, path: Path, asset: IsoAsset, checksum_url: str | None) -> None:
         """Verify the published SHA-256 when the release ships one; warn otherwise."""
-        if not asset.checksum_url:
+        if not checksum_url:
             self.download_verified = False
             return
-        if not is_allowed_github_url(asset.checksum_url):
+        parsed = urllib.parse.urlparse(checksum_url)
+        if parsed.scheme != "https":
+            raise ValueError("Checksum URL is not HTTPS")
+        mirror_base = mirror_from_environment()
+        if parsed.hostname == "github.com":
+            if not is_allowed_github_url(checksum_url):
+                raise ValueError("Checksum URL is not an allowed Prime-OS HTTPS URL")
+        elif not (mirror_base and is_allowed_mirror_url(checksum_url, mirror_base)):
             raise ValueError("Checksum URL is not an allowed Prime-OS HTTPS URL")
         request = urllib.request.Request(
-            asset.checksum_url, headers={"User-Agent": "Prime-OS-Setup"}
+            checksum_url, headers={"User-Agent": "Prime-OS-Setup"}
         )
         with urllib.request.urlopen(request, timeout=20) as response:
             text = response.read(MAX_CHECKSUM_BYTES).decode("utf-8", "replace")
@@ -531,11 +785,17 @@ class PrimeSetup:
             raise ValueError("SHA-256 checksum mismatch: the image is corrupted")
         self.download_verified = True
 
-    def _download_progress(self, share: float) -> None:
+    def _download_progress(self, share: float, downloaded: int = 0, total: int = 0) -> None:
         value = max(0.0, min(1.0, share))
         self.progress_value.set(value * 100)
         self._show_logo(value)
-        self.status.set(f"Downloading Prime-OS image… {int(value * 100)}%")
+        if total:
+            self.status.set(
+                f"Downloading Prime-OS image… {int(value * 100)}%  ·  "
+                f"{human_size(downloaded)} of {human_size(total)}"
+            )
+        else:
+            self.status.set(f"Downloading Prime-OS image… {int(value * 100)}%")
 
     def _download_complete(self, asset: IsoAsset) -> None:
         self.download_finished = True
@@ -550,6 +810,7 @@ class PrimeSetup:
         self.status.set(
             f"Downloaded {asset.name}. Continue to choose your hardware preferences."
         )
+        self.start_button.configure(state="normal", text="Download again")
         self.continue_button.configure(state="normal")
 
     # -- preferences -----------------------------------------------------
@@ -627,6 +888,7 @@ class PrimeSetup:
             "gpu_detected": gpu_name(),
             "iso_downloaded": str(self.download_path) if self.download_finished else None,
             "iso_checksum_verified": self.download_verified,
+            "download_source": self.sources[self.source_index].key,
             "mode": "preview-only; hardware allocation and OS installation are not implemented",
         }
         CONFIG_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -689,6 +951,7 @@ def self_check() -> None:
     )
     print(f"Faravahar image is valid: {logo}")
     print(f"GitHub release API: {RELEASES_API}")
+    print("Download sources: " + ", ".join(source.key for source in build_sources()))
 
 
 def main() -> None:

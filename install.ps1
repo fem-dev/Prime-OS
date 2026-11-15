@@ -22,7 +22,7 @@ $repo = 'https://github.com/fem-dev/Prime-OS.git'
 # Pinned SHA-256 of every file this installer copies. Keep in sync with
 # install.sh, install-mac.sh and loader.py whenever the sources change.
 $expectedHashes = @{
-    'loader.py'        = 'FB2EEB35B84A56AFF72AC7A33563F710CD3EDCDAB4CA39971BDC396229D3C319'
+    'loader.py'        = 'AE72B9C2220D0ED59118317CA720B324E2A14FECDE51C02386CECD16B5C88222'
     'faravahar.png'    = '7A2650C3A71E26E70DEF9E841BB3105756B246C9FBCE64DE719F0B1642FD472E'
     'you.py'           = '870972D63ACC13B13EB2FFE44420C7E01A8366064E1EBF7AC7A6D6859CA22A36'
     'requirements.txt' = 'B4506838C7BE3C862AC0DA2886CDF9DC7DC056F8C25EDF5D47038803AC21AE9A'
@@ -226,10 +226,19 @@ try {
             throw 'Could not create the Python virtual environment. Reinstall Python 3 from python.org with the "venv" component, then try again.'
         }
     }
-    Write-Step 'Installing Python dependencies...'
-    & $venvPython -m pip install --quiet --upgrade pip
-    & $venvPython -m pip install --quiet -r (Join-Path $appDir 'requirements.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Could not install the Python dependencies. Check your internet connection and try again.' }
+    # The wizard only needs Pillow. exa-py is for the optional web_search.py
+    # helper, so installing it here would add ~20 packages and a long wait.
+    Write-Step 'Installing Pillow (the only package the wizard needs)...'
+    & $venvPython -m pip install --disable-pip-version-check --no-input --progress-bar off --timeout 30 --retries 2 "Pillow>=10.0,<14"
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not install Pillow. Check your internet connection and try again. If GitHub and PyPI are blocked on your network, connect a VPN and retry, or disconnect the VPN and retry.'
+    }
+
+    # The wizard uses Tk for its window. A Python built without Tcl/Tk cannot run it.
+    & $venvPython -c "import tkinter" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'This Python installation has no Tk support, which the Prime-OS window needs. Reinstall Python 3 from python.org with the "tcl/tk and IDLE" option enabled, then run this command again.'
+    }
 
     Write-Step 'Starting Prime-OS preview setup. This does not install or replace Windows.'
     & $venvPython (Join-Path $appDir 'loader.py')

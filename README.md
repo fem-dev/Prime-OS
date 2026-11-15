@@ -17,20 +17,19 @@ ISO prototype** — not a finished installer and not a production-ready operatin
 > Prime-OS. Test the image in a virtual machine first, and use a spare USB drive if you test on
 > real hardware.
 
-## Quick start
+## Start here
 
-You do **not** need Linux, Docker or any build step. The setup wizard downloads the published
-`os.iso` from the latest GitHub release and fills the Faravahar artwork with the real download
-progress — one percent downloaded is one percent of the drawing.
+One command downloads the wizard, verifies every file, and opens the setup window. No Linux, no
+Docker, no manual build.
 
-### Windows
+### Windows (PowerShell)
 
 ```powershell
 irm https://raw.githubusercontent.com/fem-dev/Prime-OS/8ba7f8206443b75f8f9113072867724edcb7b549/install.ps1 | iex
 ```
 
 > [!TIP]
-> **If the Windows command fails with a network error** (`Unable to connect to the remote server`,
+> **If the command stops with a network error** (`Unable to connect to the remote server`,
 > `Could not connect to server`, or a timeout), the problem is the connection to GitHub, not the
 > script: **turn on a VPN and run the command again**. If a VPN is already on and it still fails,
 > **turn the VPN off** (or change servers) and retry — some VPNs, DNS filters and corporate networks
@@ -43,38 +42,61 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/8ba7f8206443b75f8f9113072
 curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
 ```
 
-Requirements: **Python 3 with Tk**, **Git**, an internet connection, and enough free space for the
-image. Pillow is installed automatically into a private virtual environment.
+Requirements: **Python 3 with Tk**, **Git**, an internet connection, and room for the image on
+disk. The installer verifies the SHA-256 of every file it installs and only adds **Pillow** to a
+private virtual environment.
 
-The wizard:
+## Pick where you download from
 
-1. checks the latest GitHub release for `os.iso`;
-2. downloads it to the app folder with a live progress drawing;
-3. verifies the size, and the published SHA-256 when the release ships a checksum file;
-4. saves your hardware preference profile.
+The first thing the wizard shows is the download source. Use **↑ ↓** (or **1 2 3**) to move, then
+**Enter** to start. The selected row is highlighted, so you always know what Enter will do.
 
-If no release has been published yet, the wizard says so plainly and only saves the profile — it
-will not pretend to install anything.
+| Source | What it does |
+| --- | --- |
+| **USA · GitHub releases** | Direct download from `github.com` — the default and the reference source |
+| **Iran · community mirror** | Uses a mirror you configure with `PRIME_OS_MIRROR_IRAN`; falls back to GitHub when unset |
+| **Best location** | Measures TCP latency to GitHub and to the mirror and picks the faster one, then shows the milliseconds |
 
-| | Windows | Linux / macOS |
-| --- | --- | --- |
-| App files | `%LOCALAPPDATA%\\Prime-OS` | `~/.local/share/prime-os` |
-| Preferences | `%APPDATA%\\Prime-OS\\setup.json` | `~/.config/prime-os/setup.json` |
+A mirror is never trusted blindly: the URL must be HTTPS on the configured host and the published
+SHA-256 checksum is still verified, so a mirror cannot hand you a different image. The selected
+source is recorded in your saved profile.
 
-## Try the live image
+## The Faravahar fills as it downloads
+
+The logo is always visible — a dim outline first, then gold swept left to right in step with real
+bytes: **1 % downloaded is 1 % of the drawing**. Below it you get the live percentage and the
+transferred size (`412.3 MiB of 1.8 GiB`). When the image is complete, the checksum status is shown.
+
+Keyboard: **↑ ↓ / 1–3** select a source, **Enter** starts, **Esc** quits.
+
+## What happens after the download
+
+1. the image is checked against the published SHA-256 when the release ships one;
+2. you choose a memory budget and a graphics target;
+3. the profile is saved to `setup.json` next to the app.
+
+If no release has been published yet, the wizard says so plainly, keeps the Faravahar on screen and
+only saves the profile — it will not pretend to install anything.
+
+| | Windows | Linux | macOS |
+| --- | --- | --- | --- |
+| App files | `%LOCALAPPDATA%\Prime-OS` | `~/.local/share/prime-os` | `~/Library/Application Support/prime-os` |
+| Preferences | `%APPDATA%\Prime-OS\setup.json` | `~/.config/prime-os/setup.json` | `~/.config/prime-os/setup.json` |
+
+## Boot the live image
 
 Write `os.iso` to a spare USB drive with any image-writing tool, or boot it directly in a UEFI
 virtual machine.
 
 ```bash
 # QEMU, read-only CD-ROM, nothing on the host is modified
-qemu-system-x86_64 -m 4G -smp 2 -cpu max -enable-kvm \\
+qemu-system-x86_64 -m 4G -smp 2 -cpu max -enable-kvm \
   -drive file=os.iso,media=cdrom,readonly=on -boot d
 ```
 
 On Windows, `./run-windows.sh` boots `out/os.iso` from Git Bash (QEMU required).
 
-### Keyboard shortcuts
+### Inside the live session
 
 | Keys | Action | Keys | Action |
 | --- | --- | --- | --- |
@@ -84,12 +106,16 @@ On Windows, `./run-windows.sh` boots `out/os.iso` from Git Bash (QEMU required).
 | `Super + G` | Steam | `Super + P` / `Super + J` | Pseudo-tile / split |
 | `Super + N` | Network settings | `Super + M` | Exit Hyprland |
 | `Super + 1…9` | Switch workspace | `Super + Shift + 1…9` | Move window to workspace |
+| `Super + H/J/K/L` | Focus left/down/up/right | `Super + Shift + H/J/K/L` | Move window in that direction |
 
 ## What the prototype contains
 
 - Arch Linux live environment built with the official [`archiso`](https://wiki.archlinux.org/title/archiso) releng profile.
-- Hyprland, Waybar, Wofi, Kitty, Dunst, NetworkManager and PipeWire/WirePlumber.
-- Steam, Lutris, Firefox and the usual Mesa/Vulkan userspace drivers.
+- Hyprland, Waybar, Wofi, Kitty, NetworkManager and PipeWire.
+- Firefox plus the usual Mesa/Vulkan userspace drivers (`vulkan-radeon`, `vulkan-intel`,
+  `vulkan-nouveau`, `nvidia-open`).
+- A baseline Hyprland config with blur and heavy effects **off** so it starts on modest GPUs and
+  inside virtual machines.
 - A minimal first-boot graphical session as the regular, unprivileged `prime` user.
 - The Faravahar setup wizard for Windows, Linux and macOS.
 
@@ -97,17 +123,32 @@ On Windows, `./run-windows.sh` boots `out/os.iso` from Git Bash (QEMU required).
 hardware tuning, and tested per-GPU configurations. One ISO cannot ship every proprietary driver;
 NVIDIA support depends on the card model.
 
+## Troubleshooting
+
+Start with the [DOCS.md error reference](DOCS.md) — it lists every failure we have seen, with the
+reason and the fix. The short version:
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `SHA-256 verification failed` | Windows Git converted the file to CRLF | Re-run; the installer normalises and retries. Never disable the check |
+| Window closes after a red line | An error escaped the script | Re-run the current command; the reason is also in `%TEMP%\prime-os-install.log` |
+| `Unable to connect to the remote server` | GitHub unreachable | Turn a VPN on — or off if one is already running — and retry |
+| `Git is required` / `Python 3 is required` | Prerequisite missing from PATH | Install Git and Python 3 (with Tk), reopen the terminal |
+| `No Prime-OS release has been published yet` | No release exists | Expected: the wizard saves a profile only |
+| Release upload fails (HTTP 422) | ISO ≥ 2 GiB, GitHub's asset limit | Reduce `profile/packages.x86_64` or host the image elsewhere |
+
 ## Integrity and safety
 
-- The artwork module `you.py` is fetched over HTTPS, checked against a pinned SHA-256, and only
-  **parsed**, never executed by the wizard.
+- The artwork module `you.py` is checked against a pinned SHA-256 and only **parsed**, never executed.
 - The logo is size- and pixel-limited before decoding, and verified against a pinned hash.
-- Release download URLs must be HTTPS and point at this repository's `releases/download` path.
+- Release download URLs must be HTTPS and point at this repository's `releases/download` path; mirror
+  URLs must be HTTPS on the host you configured.
 - Downloads land in a `.part` file and are moved into place only after the size — and the published
   checksum, when available — match.
-- Scripts verify the SHA-256 of every file they install.
-- Published hashes are pinned in `install.sh`, `install.ps1` and `loader.py`; they must be updated
-  together whenever those files change.
+- Installers verify the SHA-256 of every file they install, then copy them with `0600` permissions.
+- Pinned hashes live in `install.sh`, `install-mac.sh`, `install.ps1` and `loader.py`; they must be
+  updated together whenever those files change. `.gitattributes` keeps line endings at LF so the
+  bytes — and the hashes — stay identical on every platform.
 
 Verify a downloaded image yourself:
 
@@ -142,48 +183,45 @@ Docker Desktop.
 
 1. Open **Actions → Build and publish ISO → Run workflow**.
 2. Enter a release tag (default `os-preview`) — the release is created if it does not exist.
-3. The job builds in a privileged Docker container, shows **one progress bar**, then uploads
-   `os.iso` and `os.iso.sha256` to that release. The full build log stays an artifact.
+3. The job checks the ISO size first, builds in a privileged Docker container, shows **one progress
+   bar**, then uploads `os.iso` and `os.iso.sha256` to that release. The full build log stays an
+   artifact.
 
-Pushing a `v*` tag does the same. Nothing has to be built on your own machine; a Codespace works
-for interactive testing with the same Docker command, and the progress wrapper works there too.
+Pushing a `v*` tag does the same. If the image is 2 GiB or larger, GitHub will not accept it as a
+release asset; the workflow warns and skips publication instead of failing the build.
 
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `loader.py` | Setup wizard: release lookup, ISO download, artwork progress, profile |
-| `install.sh` / `install.ps1` | One-command bootstrap for Linux/macOS and Windows |
+| `loader.py` | Setup wizard: source picker, release lookup, ISO download, artwork progress, profile |
+| `install.sh` / `install-mac.sh` / `install.ps1` | One-command bootstrap for Linux, macOS and Windows |
 | `you.py` | Faravahar vector renderer (shipped as data, parsed but not executed) |
-| `faravahar.png` | Logo used by the wizard and the live session |
+| `faravahar.png` | Logo drawn behind the progress bar |
 | `profile/packages.x86_64` | Extra packages merged into the ArchISO profile |
 | `profile/airootfs/` | Files placed in the live image (Hyprland, Waybar, autologin, setup) |
 | `build.sh` / `build.ps1` | Reproducible ISO build inside Docker |
 | `run-windows.sh` | Boot the built ISO in QEMU from Git Bash |
-| `web_search.py` | Exa web search helper for contributors and agents (`EXA_API_KEY`) |
-| `.env.example` | Placeholder environment variables; copy it to `.env` (git-ignored) |
-| `requirements.txt` | Python dependencies (`Pillow`, `exa-py`) for the wizard and search helper |
+| `web_search.py` | Exa web search helper for contributors (`EXA_API_KEY`) |
+| `.gitattributes` | Forces LF everywhere so the pinned SHA-256 values stay stable |
+| `DOCS.md` | Developer error reference: symptom, cause, fix |
 | `NOTICE.md` | What the project is and is not: licensing, trademarks, safety, status |
 | `.github/` | Actions workflow that builds the ISO and publishes it to releases |
-
-The live session is started once, on `tty1`, by the `getty` autologin drop-in plus
-`/etc/skel/.bash_profile`; `prime-os-live-setup` creates the unprivileged `prime` user and installs
-the canonical `/etc/prime-os/hyprland.conf`.
 
 ## Project status
 
 This is a starting point, not a finished gaming OS. Next milestones: validate the first published
 image on real hardware, fix startup and package issues, design an installer, then add tested gaming
-profiles plus update and recovery flows. Hardware test reports and contributions are welcome — see
-[CONTRIBUTING](#contributing).
+profiles plus update and recovery flows. Hardware test reports and contributions are welcome.
 
 ## Contributing
 
 - Keep the ISO honest: no claims of "lag-free" gaming, no benchmark numbers without measurements.
 - Test in a virtual machine before physical hardware, and never ask users to flash a drive that
   holds their data.
-- If you change `loader.py`, `you.py` or `faravahar.png`, update the pinned hashes in the installers
-  in the same commit — the installers fail closed on purpose.
+- If you change `loader.py`, `you.py` or `faravahar.png`, update the pinned hashes in all three
+  installers (`loader.py` needs the matching `ART_SHA256`/`LOGO_SHA256`) in the same commit — the
+  installers fail closed on purpose. `DOCS.md` lists the exact places and the checks to run.
 - Report your GPU model, driver version and what worked or failed.
 
 ## License

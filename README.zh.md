@@ -32,6 +32,22 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/8ba7f8206443b75f8f9113072
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
 ```
+## 选择下载源
+
+向导首先显示下载源列表。用 **↑ ↓**（或 **1 2 3**）移动，按 **Enter** 开始。
+
+| 源 | 行为 |
+| --- | --- |
+| **USA · GitHub releases** | 直接从 `github.com` 下载 —— 默认且为基准 |
+| **Iran · community mirror** | 使用通过 `PRIME_OS_MIRROR_IRAN` 配置的镜像；未配置时回退到 GitHub |
+| **Best location** | 测量到 GitHub 与镜像的 TCP 延迟，选择更快的并显示毫秒数 |
+
+镜像从不被盲目信任：地址必须是配置主机的 HTTPS，并且仍会校验发布的 SHA-256，因此镜像无法提供
+不同的镜像文件。所选源会记录在你的配置文件中。
+
+## 故障排查
+
+请看 [DOCS.md 错误参考](DOCS.md)：每个已知故障、原因与解决方法。
 
 **先决条件：** **Python 3 配合 Tk**，**Git**，互联网连接，以及足够的空间用于镜像。Pillow 会自动安装在私有的虚拟环境中。
 

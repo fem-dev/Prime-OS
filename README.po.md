@@ -33,6 +33,22 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/8ba7f8206443b75f8f9113072
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
 ```
+## Escolher a fonte de download
+
+A primeira tela mostra as fontes. Mova com **↑ ↓** (ou **1 2 3**) e pressione **Enter** para iniciar.
+
+| Fonte | Comportamento |
+| --- | --- |
+| **USA · GitHub releases** | Download direto de `github.com` — padrão e referência |
+| **Iran · community mirror** | Usa um espelho definido em `PRIME_OS_MIRROR_IRAN`; sem ele volta ao GitHub |
+| **Best location** | Mede a latência TCP até o GitHub e o espelho, escolhe o mais rápido e mostra os milissegundos |
+
+Um espelho nunca é aceito às cegas: a URL precisa ser HTTPS no host configurado e o SHA-256
+publicado continua sendo verificado. A fonte escolhida é gravada no seu perfil.
+
+## Solução de problemas
+
+Comece pela [referência de erros em DOCS.md](DOCS.md): cada falha conhecida com causa e correção.
 
 **Pré-requisitos:** **Python 3 com Tk**, **Git**, uma conexão Internet, e suficiente espaço livre para a imagem. Pillow é instalado automaticamente em um ambiente virtual privado.
 
