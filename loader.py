@@ -103,7 +103,7 @@ class Source:
 
 def mirror_from_environment() -> str | None:
     """Optional mirror for the Iran entry, e.g. https://mirror.example.net/prime-os."""
-    value = os.environ.get("PRIME_OS_MIRROR_IRAN", "").strip().rstrip("/")
+    value = os.environ.get("ir", "").strip().rstrip("/")
     if not value:
         return None
     parsed = urllib.parse.urlparse(value)
@@ -117,7 +117,7 @@ def build_sources() -> list[Source]:
     iran_detail = (
         f"Iran · mirror {urllib.parse.urlparse(mirror).hostname}"
         if mirror
-        else "Iran · set PRIME_OS_MIRROR_IRAN to use a local mirror (falls back to GitHub)"
+        else "this is not set"
     )
     return [
         Source("usa", "USA · GitHub releases", "Direct download from github.com (default)", None),
