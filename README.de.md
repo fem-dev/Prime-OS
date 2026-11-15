@@ -44,25 +44,17 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/25aa65ac8e7cb6ef35dc0d4b6
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
 ```
-## Download-Quelle wählen
+## Download-Quelle
 
-Der Assistent zeigt zuerst die Download-Quellen. Mit **↑ ↓** (oder **1 2 3**) wählen, dann **Enter**
-zum Start.
-
-| Quelle | Verhalten |
-| --- | --- |
-| **USA · GitHub releases** | Direkter Download von `github.com` — Standard und Referenz |
-| **Iran · community mirror** | Nutzt einen Spiegel aus `PRIME_OS_MIRROR_IRAN`; ohne Eintrag greift GitHub |
-| **Best location** | Misst die TCP-Latenz zu GitHub und zum Spiegel, wählt den schnelleren und zeigt die Millisekunden |
-
-Ein Spiegel wird nie blind vertraut: die URL muss HTTPS auf dem konfigurierten Host sein und die
-veröffentlichte SHA-256-Prüfsumme wird weiterhin geprüft. Die gewählte Quelle landet im Profil.
+Prime-OS hat genau **eine** offizielle Quelle: die **GitHub-Releases** des Projekts. Es gibt keinen
+Spiegel und keinen Drittanbieter, daher kann ein Image nur aus dem Repository kommen, das seine
+SHA-256-Prüfsumme veröffentlicht. **Enter** startet, **Esc** beendet.
 
 ## Fehlerbehebung
 
-Beginne mit der [Fehlerreferenz in DOCS.md](DOCS.md): jeder bekannte Fehler mit Ursache und Lösung.
+Die [Fehlerreferenz in DOCS.md](DOCS.md) nennt jeden bekannten Fehler mit Ursache und Lösung.
 
-Voraussetzungen: **Python 3 mit Tk**, **Git**, eine Internetverbindung und genug freier Speicher für
+Voraussetzungen: **Python 3 mit Tk**, **curl**, eine Internetverbindung und genug freier Speicher für
 das Image. Pillow wird automatisch in einer privaten virtuellen Umgebung installiert.
 
 Der Assistent:

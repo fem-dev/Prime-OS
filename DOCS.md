@@ -50,8 +50,23 @@ LF  you.py  → 870972d63acc13b13eb2ffe44420c7e01a8366064e1ebf7ac7a6d6859ca22a36
 CRLF you.py → aa4b165b77553dc71b9ea582883df62acb0ed711748e38838cd82b98771ca739
 ```
 
-Rarer causes: a proxy or antivirus that rewrites text, a partial clone, or a
+Rarer causes: a proxy or antivirus that rewrites text, a partial download, or a
 pinned hash that was never updated after editing a file.
+
+**The failure everyone actually hit.** The installers used to `git clone` the
+moving `main` branch and then compare the result with hashes pinned in the
+installer. The moment `loader.py` changed on `main`, every installer that had
+already been published demanded the old bytes and refused the new ones:
+
+```
+loader.py SHA-256 verification failed.
+```
+
+That is a design bug, not a bad download. Installers now fetch the four files
+from an **exact commit** (`$pinnedCommit` in `install.ps1`, `PINNED_COMMIT` in
+the shell installers) over `raw.githubusercontent.com`, so the bytes and the
+hashes always belong to the same revision, forever, no matter what `main` does
+next. When you bump a hash you must also bump the commit — see §17.
 
 **Fix (three layers already in the repo — keep them)**
 
@@ -136,20 +151,21 @@ exit nodes all produce this exact message `Could not connect to server`.
 **Fix.** Try in this order: turn a VPN **on**; if one was already on, turn it
 **off** (some providers block GitHub themselves); change the VPN server; then
 confirm `https://github.com` opens in a browser. There is nothing in the scripts
-that can work around a blocked route — do not add mirror URLs to the code just to
+that can work around a blocked route — do not add another host to the code just to
 make one network work.
 
 ---
 
-## 6. `Git is required` / `Python 3 is required` / `no Tk support`
+## 6. `Python 3 is required` / `no Tk support` / `curl is required`
 
 **Symptom.** The installer stops during the prerequisite step.
 
 **Cause.**
 
-- Git missing on PATH (common in a minimal Windows image).
 - `python` resolves to the Microsoft Store stub, or Python was installed without
   "Add python.exe to PATH".
+- `curl` missing on a minimal Linux image (the shell installers download the
+  launcher with it; GitHub is not reachable with `wget` through every proxy).
 - Python has no Tk: Debian/Ubuntu need `python3-tk`, Arch needs `tk`, and a
   Windows Python installed without "tcl/tk and IDLE" has no `tkinter` at all.
 
@@ -157,12 +173,13 @@ make one network work.
 
 ```bash
 # Debian / Ubuntu
-sudo apt install python3 python3-venv python3-tk git
+sudo apt install python3 python3-venv python3-tk curl
 
 # Arch
-sudo pacman -S python python-tk git
+sudo pacman -S python python-tk curl
 ```
 
+Git is **not** required any more — the installers download four files directly.
 Windows: reinstall Python 3 from python.org with both PATH and Tcl/Tk options.
 `install.ps1` now checks `import tkinter` inside the venv and says so explicitly.
 
@@ -317,26 +334,28 @@ Only resolve conflicts by hand if you really have local work to keep.
 
 ---
 
-## 16. Download source selection: how it is meant to work
+## 16. Where the image comes from (there are no mirrors)
 
-`loader.py` offers three sources: **USA · GitHub releases** (default),
-**Iran · community mirror**, and **Best location · fastest ping**.
+`loader.py` has exactly one download source: this repository's **GitHub
+releases**. There is no mirror, no fallback host and no `PRIME_OS_MIRROR_*`
+environment variable. That is deliberate:
 
-- GitHub is the only authoritative source. Its release URL is validated against
-  `https://github.com/fem-dev/Prime-OS/releases/download/...` before any byte is
-  written.
-- The Iran entry is a *mirror hook*, not a hidden host: it does nothing until you
-  set `PRIME_OS_MIRROR_IRAN=https://mirror.example.net` in the environment. The
-  mirror must serve the same release path over HTTPS and the checksum is still
-  verified, so a malicious mirror cannot ship a different image.
-- "Best location" measures TCP connect time to `github.com` and to the mirror
-  host (when configured) and picks the faster one, then reports the numbers in
-  the window.
+- the image and the SHA-256 that identifies it come from the same repository, so
+  a third party cannot substitute a different file;
+- every accepted URL must be HTTPS and start with
+  `https://github.com/fem-dev/Prime-OS/releases/download/`
+  (`is_allowed_github_url`), for both the image and the checksum;
+- the asset name is reduced to a plain file name before it touches the disk
+  (`safe_iso_name`), so release metadata can never escape the app folder.
 
-When adding a real mirror: keep it HTTPS-only, keep the checksum check, and
-document the latency you measured. Do not add a source that cannot be verified.
+The wizard still shows a source card, because the download destination should
+never be a surprise, but it lists one entry and `Enter` starts the download.
 
----
+If you ever want to add a mirror, it needs all of these, in one change: HTTPS
+only, an explicit allowlist of its host, the published checksum still verified,
+the latency number measured and documented, and a note in the README tables —
+then update `build_sources()` and the source guards together. Do not add an
+unverified mirror just to make one network reach GitHub.
 
 ## 17. Regression checklist before you push
 
@@ -353,10 +372,18 @@ bash -n install.sh install-mac.sh
 # Pinned hashes still match the files
 sha256sum loader.py you.py faravahar.png requirements.txt
 
+# The commit the installers download from still contains these exact files
+git show "$(grep -oP "PINNED_COMMIT=\"\K[0-9a-f]{40}" install.sh):loader.py" | sha256sum
+
 # PowerShell syntax (on Windows or with pwsh)
 pwsh -NoProfile -Command '[System.Management.Automation.Language.Parser]::ParseFile(
     (Resolve-Path ./install.ps1), [ref]$null, [ref]$null); "parse OK"'
 ```
 
-If you edited `loader.py`, remember the three installer pins and the README
-commit pin; they are the most frequent cause of a "broken install" report.
+If you edited `loader.py`, one commit must carry all of it: the new file, its
+new SHA-256 in `install.sh` / `install-mac.sh` / `install.ps1` / `loader.py`, and
+the **commit pin** that points at the commit containing that file (commit the
+file first, then set `PINNED_COMMIT` / `$pinnedCommit` to that hash and commit
+the installers). Finally re-point the Windows command in every README at the
+installer commit. Skipping any of these is the most frequent cause of a
+"broken install" report.

@@ -42,24 +42,16 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/25aa65ac8e7cb6ef35dc0d4b6
 curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
 ```
 
-Requirements: **Python 3 with Tk**, **Git**, an internet connection, and room for the image on
-disk. The installer verifies the SHA-256 of every file it installs and only adds **Pillow** to a
-private virtual environment.
+Requirements: **Python 3 with Tk**, **curl**, an internet connection, and room for the image on
+disk. Git is not needed. The installer downloads four files from a **pinned commit**, verifies the
+SHA-256 of every one of them, and only adds **Pillow** to a private virtual environment.
 
-## Pick where you download from
+## Download source
 
-The first thing the wizard shows is the download source. Use **↑ ↓** (or **1 2 3**) to move, then
-**Enter** to start. The selected row is highlighted, so you always know what Enter will do.
-
-| Source | What it does |
-| --- | --- |
-| **USA · GitHub releases** | Direct download from `github.com` — the default and the reference source |
-| **Iran · community mirror** | Uses a mirror you configure with `PRIME_OS_MIRROR_IRAN`; falls back to GitHub when unset |
-| **Best location** | Measures TCP latency to GitHub and to the mirror and picks the faster one, then shows the milliseconds |
-
-A mirror is never trusted blindly: the URL must be HTTPS on the configured host and the published
-SHA-256 checksum is still verified, so a mirror cannot hand you a different image. The selected
-source is recorded in your saved profile.
+Prime-OS has exactly **one** official download source: the project's own **GitHub releases**. There
+is no mirror and no third-party host, so an image can only come from the repository that publishes
+its SHA-256. The wizard shows that source card before writing any byte; press **Enter** to start or
+**Esc** to quit.
 
 ## The Faravahar fills as it downloads
 
@@ -67,7 +59,7 @@ The logo is always visible — a dim outline first, then gold swept left to righ
 bytes: **1 % downloaded is 1 % of the drawing**. Below it you get the live percentage and the
 transferred size (`412.3 MiB of 1.8 GiB`). When the image is complete, the checksum status is shown.
 
-Keyboard: **↑ ↓ / 1–3** select a source, **Enter** starts, **Esc** quits.
+Keyboard: **Enter** starts the download, **Esc** quits.
 
 ## What happens after the download
 
@@ -133,7 +125,8 @@ reason and the fix. The short version:
 | `SHA-256 verification failed` | Windows Git converted the file to CRLF | Re-run; the installer normalises and retries. Never disable the check |
 | Window closes after a red line | An error escaped the script | Re-run the current command; the reason is also in `%TEMP%\prime-os-install.log` |
 | `Unable to connect to the remote server` | GitHub unreachable | Turn a VPN on — or off if one is already running — and retry |
-| `Git is required` / `Python 3 is required` | Prerequisite missing from PATH | Install Git and Python 3 (with Tk), reopen the terminal |
+| `Could not download loader.py from GitHub` | No route to GitHub | Turn a VPN on — or off if one is already on — and retry |
+| `Python 3 is required` / `no Tk support` | Python or Tk missing | Install Python 3 with Tk, reopen the terminal |
 | `No Prime-OS release has been published yet` | No release exists | Expected: the wizard saves a profile only |
 | Release upload fails (HTTP 422) | ISO ≥ 2 GiB, GitHub's asset limit | Reduce `profile/packages.x86_64` or host the image elsewhere |
 
@@ -141,11 +134,12 @@ reason and the fix. The short version:
 
 - The artwork module `you.py` is checked against a pinned SHA-256 and only **parsed**, never executed.
 - The logo is size- and pixel-limited before decoding, and verified against a pinned hash.
-- Release download URLs must be HTTPS and point at this repository's `releases/download` path; mirror
-  URLs must be HTTPS on the host you configured.
+- Release download URLs must be HTTPS and point at this repository's `releases/download` path.
+  Nothing else is accepted, so no mirror can substitute its own image.
 - Downloads land in a `.part` file and are moved into place only after the size — and the published
   checksum, when available — match.
-- Installers verify the SHA-256 of every file they install, then copy them with `0600` permissions.
+- Installers fetch the four launcher files from a **pinned commit** (never the moving `main` branch),
+  verify the SHA-256 of each one, then copy them with `0600` permissions.
 - Pinned hashes live in `install.sh`, `install-mac.sh`, `install.ps1` and `loader.py`; they must be
   updated together whenever those files change. `.gitattributes` keeps line endings at LF so the
   bytes — and the hashes — stay identical on every platform.

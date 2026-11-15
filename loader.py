@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Prime-OS setup wizard and live-image downloader.
 
-The wizard asks which download source you want (GitHub in the USA, an optional
-Iranian mirror, or an automatic "best location" probe), downloads the published
-Prime-OS live image (``os.iso``), and fills the Faravahar artwork in step with
-the real byte progress: one percent of the download is one percent of the
+The wizard downloads the published Prime-OS live image (``os.iso``) from GitHub
+releases — the only official source — and fills the Faravahar artwork in step
+with the real byte progress: one percent of the download is one percent of the
 drawing.
 
 It never repartitions a disk, writes a USB drive or installs an operating
@@ -19,11 +18,9 @@ import io
 import json
 import os
 import platform
-import socket
 import subprocess
 import sys
 import threading
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -52,7 +49,7 @@ MAX_LOGO_BYTES = 2 * 1024 * 1024
 MAX_LOGO_PIXELS = 20_000_000
 MAX_CHECKSUM_BYTES = 256 * 1024
 CHUNK_SIZE = 256 * 1024
-MAX_ISO_BYTES = 8 * 1024 ** 3     # a mirror cannot stream more than this onto the disk
+MAX_ISO_BYTES = 8 * 1024 ** 3     # a hostile host cannot stream more than this onto the disk
 
 if os.name == "nt":
     APP_DIR = Path(
@@ -93,36 +90,26 @@ class IsoAsset:
 
 @dataclass(frozen=True)
 class Source:
-    """A place the image can be downloaded from."""
+    """Where the image comes from.
+
+    Prime-OS publishes exactly one download source: its own GitHub releases.
+    Mirrors are not supported on purpose — an image must come from the same
+    repository that publishes its SHA-256, so no third party can hand you a
+    different file.
+    """
 
     key: str
     title: str
     detail: str
-    mirror_base: str | None = None   # None means "use the GitHub release URL"
-
-
-def mirror_from_environment() -> str | None:
-    """Optional mirror for the Iran entry, e.g. https://mirror.example.net/prime-os."""
-    value = os.environ.get("ir", "").strip().rstrip("/")
-    if not value:
-        return None
-    parsed = urllib.parse.urlparse(value)
-    if parsed.scheme != "https" or not parsed.hostname:
-        return None
-    return value
 
 
 def build_sources() -> list[Source]:
-    mirror = mirror_from_environment()
-    iran_detail = (
-        f"Iran · mirror {urllib.parse.urlparse(mirror).hostname}"
-        if mirror
-        else "this is not set"
-    )
     return [
-        Source("usa", "USA · GitHub releases", "Direct download from github.com (default)", None),
-        Source("iran", "Iran · community mirror", iran_detail, mirror),
-        Source("best", "Best location · fastest ping", "Measures both hosts and picks the quicker one", None),
+        Source(
+            "github",
+            "GitHub releases · official",
+            "Direct HTTPS download from github.com — the only source Prime-OS publishes",
+        )
     ]
 
 
@@ -137,17 +124,6 @@ def is_allowed_github_url(url: str) -> bool:
         parsed.scheme == "https"
         and parsed.hostname == "github.com"
         and parsed.path.startswith(f"/{REPO}/releases/download/")
-    )
-
-
-def is_allowed_mirror_url(url: str, mirror_base: str) -> bool:
-    """A mirror may only serve HTTPS from its own host, using the same path."""
-    parsed = urllib.parse.urlparse(url)
-    base = urllib.parse.urlparse(mirror_base)
-    return (
-        parsed.scheme == "https"
-        and parsed.hostname == base.hostname
-        and parsed.path.startswith("/")
     )
 
 
@@ -208,31 +184,6 @@ def gpu_name() -> str:
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
         pass
     return "GPU not detected automatically"
-
-
-def tcp_latency_ms(host: str, port: int = 443, attempts: int = 2) -> float | None:
-    """Median TCP connect time in milliseconds, or None when the host is unreachable."""
-    samples: list[float] = []
-    for _ in range(attempts):
-        started = time.perf_counter()
-        try:
-            with socket.create_connection((host, port), timeout=4):
-                pass
-        except OSError:
-            continue
-        samples.append((time.perf_counter() - started) * 1000.0)
-    if not samples:
-        return None
-    samples.sort()
-    return samples[len(samples) // 2]
-
-
-def mirror_url_for(asset_url: str, mirror_base: str) -> str:
-    """Reuse the release path on the mirror host: /releases/download/<tag>/<file>."""
-    parsed = urllib.parse.urlparse(asset_url)
-    return urllib.parse.urlunparse(
-        (parsed.scheme, urllib.parse.urlparse(mirror_base).netloc, parsed.path, "", "", "")
-    )
 
 
 def pick_iso_asset(release: dict) -> IsoAsset | None:
@@ -404,7 +355,7 @@ class PrimeSetup:
 
         tk.Label(
             wrapper,
-            text="Use ↑ ↓ (or 1–3) to select · Enter to start · Esc to quit",
+            text="Enter to start · Esc to quit",
             fg=MUTED, bg=BG, font=(self.ui_font, 8),
         ).pack(pady=(8, 10))
 
@@ -601,7 +552,7 @@ class PrimeSetup:
         if str(self.start_button["state"]) == "disabled":
             return
         self.start_button.configure(state="disabled")
-        self.status.set(f"Contacting GitHub through {self.sources[self.source_index].title}…")
+        self.status.set("Contacting GitHub releases…")
         threading.Thread(target=self._check_release_worker, daemon=True).start()
 
     def _check_release_worker(self) -> None:
@@ -621,8 +572,7 @@ class PrimeSetup:
                     "preview mode; it will not pretend to install an OS."
                 ))
                 return
-            source = self.sources[self.source_index]
-            self.root.after(0, lambda: self._start_download(asset, source))
+            self.root.after(0, lambda: self._start_download(asset))
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 message = (
@@ -632,7 +582,7 @@ class PrimeSetup:
             elif exc.code == 403:
                 message = (
                     "GitHub refused the release check (HTTP 403, likely a rate limit). "
-                    "Retry in a few minutes, or pick the Iran mirror in the source list."
+                    "Retry in a few minutes, or run the setup again later."
                 )
             else:
                 message = (
@@ -654,44 +604,9 @@ class PrimeSetup:
         self.continue_button.configure(state="normal")
         self._render_sources()
 
-    def _resolve_source(self, asset: IsoAsset, source: Source) -> tuple[str, str | None, str]:
-        """Return (image_url, checksum_url, human label) for the chosen source."""
-        if source.key == "iran" and source.mirror_base:
-            return (
-                mirror_url_for(asset.url, source.mirror_base),
-                mirror_url_for(asset.checksum_url, source.mirror_base) if asset.checksum_url else None,
-                "the Iran mirror",
-            )
-        if source.key == "iran" and not source.mirror_base:
-            return asset.url, asset.checksum_url, "GitHub (no Iran mirror is configured)"
-
-        if source.key == "best" and source.mirror_base is None and mirror_from_environment():
-            mirror = mirror_from_environment()
-            github_ms = tcp_latency_ms("github.com")
-            mirror_ms = tcp_latency_ms(urllib.parse.urlparse(mirror).hostname)
-            if mirror_ms is not None and (github_ms is None or mirror_ms < github_ms):
-                return (
-                    mirror_url_for(asset.url, mirror),
-                    mirror_url_for(asset.checksum_url, mirror) if asset.checksum_url else None,
-                    f"the Iran mirror ({mirror_ms:.0f} ms vs GitHub "
-                    f"{'unreachable' if github_ms is None else f'{github_ms:.0f} ms'})",
-                )
-            if github_ms is not None:
-                return asset.url, asset.checksum_url, f"GitHub ({github_ms:.0f} ms)"
-        if source.key == "best":
-            github_ms = tcp_latency_ms("github.com")
-            if github_ms is None:
-                return asset.url, asset.checksum_url, "GitHub (no faster host responded)"
-            return asset.url, asset.checksum_url, f"GitHub ({github_ms:.0f} ms, only host configured)"
-        return asset.url, asset.checksum_url, "GitHub"
-
-    def _start_download(self, asset: IsoAsset, source: Source) -> None:
-        try:
-            image_url, checksum_url, label = self._resolve_source(asset, source)
-        except Exception as exc:  # noqa: BLE001 - surfaced in the window
-            self._release_missing(f"Could not prepare the download: {exc}")
-            return
-        self.status.set(f"Downloading {asset.name} from {label}…")
+    def _start_download(self, asset: IsoAsset) -> None:
+        image_url, checksum_url = asset.url, asset.checksum_url
+        self.status.set(f"Downloading {asset.name} from GitHub releases…")
         self.logo_hint.configure(text="The Faravahar fills with the real download progress")
         APP_DIR.mkdir(parents=True, exist_ok=True)
         try:
@@ -701,21 +616,18 @@ class PrimeSetup:
             return
         threading.Thread(
             target=self._download_worker,
-            args=(asset, image_url, checksum_url, source),
+            args=(asset, image_url, checksum_url),
             daemon=True,
         ).start()
 
     def _download_worker(
-        self, asset: IsoAsset, image_url: str, checksum_url: str | None, source: Source
+        self, asset: IsoAsset, image_url: str, checksum_url: str | None
     ) -> None:
         destination = self.download_path
         assert destination is not None
         temporary = destination.with_suffix(destination.suffix + ".part")
         try:
-            if source.key == "iran" and source.mirror_base:
-                if not is_allowed_mirror_url(image_url, source.mirror_base):
-                    raise ValueError("Mirror URL is not the configured Prime-OS HTTPS mirror")
-            elif not is_allowed_github_url(image_url):
+            if not is_allowed_github_url(image_url):
                 raise ValueError("GitHub release asset URL is not an allowed Prime-OS HTTPS URL")
             request = urllib.request.Request(
                 image_url,
@@ -751,7 +663,7 @@ class PrimeSetup:
             except OSError:
                 pass
             self.root.after(0, lambda error=str(exc): self._release_missing(
-                f"ISO download failed: {error}. Try another download source."
+                f"ISO download failed: {error}. Check the connection and try again."
             ))
 
     def _verify_checksum(self, path: Path, asset: IsoAsset, checksum_url: str | None) -> None:
@@ -762,11 +674,7 @@ class PrimeSetup:
         parsed = urllib.parse.urlparse(checksum_url)
         if parsed.scheme != "https":
             raise ValueError("Checksum URL is not HTTPS")
-        mirror_base = mirror_from_environment()
-        if parsed.hostname == "github.com":
-            if not is_allowed_github_url(checksum_url):
-                raise ValueError("Checksum URL is not an allowed Prime-OS HTTPS URL")
-        elif not (mirror_base and is_allowed_mirror_url(checksum_url, mirror_base)):
+        if not is_allowed_github_url(checksum_url):
             raise ValueError("Checksum URL is not an allowed Prime-OS HTTPS URL")
         request = urllib.request.Request(
             checksum_url, headers={"User-Agent": "Prime-OS-Setup"}
@@ -888,7 +796,7 @@ class PrimeSetup:
             "gpu_detected": gpu_name(),
             "iso_downloaded": str(self.download_path) if self.download_finished else None,
             "iso_checksum_verified": self.download_verified,
-            "download_source": self.sources[self.source_index].key,
+            "download_source": "github",
             "mode": "preview-only; hardware allocation and OS installation are not implemented",
         }
         CONFIG_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -951,7 +859,7 @@ def self_check() -> None:
     )
     print(f"Faravahar image is valid: {logo}")
     print(f"GitHub release API: {RELEASES_API}")
-    print("Download sources: " + ", ".join(source.key for source in build_sources()))
+    print("Download source: " + ", ".join(source.title for source in build_sources()))
 
 
 def main() -> None:
