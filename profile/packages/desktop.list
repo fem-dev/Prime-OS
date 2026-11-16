@@ -1,0 +1,11 @@
+# Group: desktop
+# Wayland session: compositor, panel, launcher, portals, audio.
+hyprland
+waybar
+wofi
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+pipewire
+pipewire-alsa
+alsa-utils
+pcmanfm

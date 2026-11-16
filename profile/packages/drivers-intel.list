@@ -1,0 +1,4 @@
+# Group: drivers-intel
+# Intel integrated graphics, including the firmware blob set.
+vulkan-intel
+linux-firmware-intel

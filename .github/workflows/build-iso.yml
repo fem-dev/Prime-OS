@@ -15,6 +15,10 @@ on:
         description: Mark the release as a pre-release
         type: boolean
         default: true
+      groups:
+        description: "Package groups to include, space-separated (empty = default slim set, 'all' = everything)"
+        required: false
+        default: ""
   push:
     tags:
       - "v*"
@@ -45,6 +49,10 @@ jobs:
       # push to main refreshes the rolling os-preview release.
       TAG: ${{ inputs.tag || (github.ref_type == 'tags' && github.ref_name || 'os-preview') }}
       PRERELEASE_INPUT: ${{ inputs.prerelease }}
+      # Each component of the image is its own list under profile/packages;
+      # build.sh merges only the groups named here (empty string = default set,
+      # which leaves out NVIDIA, the 32-bit libraries and CJK fonts).
+      PRIME_OS_GROUPS: ${{ inputs.groups }}
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -72,6 +80,8 @@ jobs:
 
       - name: Check the image
         run: |
+          echo "package groups: $(cat out/groups.txt 2>/dev/null || echo 'unknown')"
+          echo "### Package groups: \`$(cat out/groups.txt 2>/dev/null || echo unknown)\`" >> "$GITHUB_STEP_SUMMARY"
           ls -lh out/os.iso
           file out/os.iso
           size=$(stat -c%s out/os.iso)

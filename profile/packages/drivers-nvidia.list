@@ -1,0 +1,6 @@
+# Group: drivers-nvidia (optional)
+# Proprietary NVIDIA stack. This group alone is ~1.6 GiB installed
+# (nvidia-utils 1.0 GiB): enable it only when NVIDIA hardware matters.
+nvidia-open
+linux-firmware-nvidia
+vulkan-nouveau

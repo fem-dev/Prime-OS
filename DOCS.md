@@ -273,7 +273,7 @@ or chown the tree back to the runner before removing it. Do not `chmod 777`.
 
 ---
 
-## 11. `target not found` while building the ISO
+## 11. `target not found` / `Unknown package group` while building
 
 **Symptom.** `pacman -S` aborts on a package name that is not in the configured
 repositories.
@@ -284,8 +284,23 @@ Arch. Multilib-only packages (`steam`) also fail unless `[multilib]` is enabled 
 `build.sh` enables it only inside the temporary profile.
 
 **Fix.** Check the name first (`pacman -Ss <name>`), then either drop it or use
-the current replacement. Keep `profile/packages.x86_64` lean; every entry is
-download weight and a future breakage.
+the current replacement.
+
+**Where packages come from.** There is no single package list any more: every
+component is its own file under `profile/packages/` (`base.list`,
+`desktop.list`, `drivers-nvidia.list`, `gaming-32bit.list`, …) and `build.sh`
+merges only the groups named in `PRIME_OS_GROUPS`. Consequences worth knowing:
+
+- `base` is always built even when you forget it — the session cannot boot
+  without it.
+- An unknown name fails fast: `Unknown package group 'foo'. Available: apps base
+  desktop …`. Add `profile/packages/foo.list` to create one.
+- `multilib` is enabled in the temporary profile only when `gaming-32bit` is
+  selected; without that group the build would otherwise fail on `lib32-*`.
+- The selection is recorded in `out/groups.txt` and echoed into the build log, so
+  a machine can tell which image it is running.
+- Each group is also a weight decision: `drivers-nvidia` alone is ~1.6 GiB
+  installed and `fonts-cjk` ~190 MiB compressed. That is why they are opt-in.
 
 ---
 

@@ -165,9 +165,27 @@ docker run --rm --privileged \
   bash -lc 'pacman -Syu --noconfirm archiso && bash ./build.sh'
 ```
 
+هیچ چیزی به‌صورت پیش‌فرض داخل ایمیج نمی‌رود مگر خودتان بخواهید: ایمیج از گروه‌های
+`profile/packages/` ساخته می‌شود. مجموعهٔ پیش‌فرض `base desktop apps fonts drivers-amd
+drivers-intel` است؛ یعنی درایور NVIDIA، کتابخانه‌های ۳۲ بیتی و فونت CJK داخلش نیست
+(حدود ۲.۴ گیگابایت ← حدود ۱.۶ گیگابایت). هر چه خواستید اضافه کنید:
+
+```bash
+# همه‌چیز، شامل NVIDIA و کتابخانه‌های ۳۲ بیتی و فونت CJK
+docker run --rm --privileged -e PRIME_OS_BUILD_CONTAINER=1 \
+  -e PRIME_OS_GROUPS=all -v "$PWD:/work" -w /work archlinux:latest \
+  bash -lc 'pacman -Syu --noconfirm archiso && bash ./build.sh'
+
+# فقط چیزی که یک سیستم مشخص لازم دارد
+-e PRIME_OS_GROUPS="base desktop apps fonts drivers-nvidia"
+```
+
+`base` همیشه هست، نام گروه ناشناس ساخت را با فهرست گروه‌های موجود متوقف می‌کند، و
+گروه‌های انتخاب‌شده در `out/groups.txt` ثبت می‌شوند.
+
 `build.sh` بیرون از یک کانتینر Arch مشخص‌شده اجرا نمی‌شود؛ پروفایل رسمی releng را در
 `.build/profile` کپی می‌کند، مخزن `multilib` را فقط برای Steam **در همان پروفایل موقت** فعال می‌کند،
-`profile/packages.x86_64` را ادغام می‌کند و نتیجه را در `out/os.iso` می‌نویسد.
+فقط فایل‌های گروه‌های انتخاب‌شده را از `profile/packages/` ادغام می‌کند و نتیجه را در `out/os.iso` می‌نویسد.
 
 ویندوز نمی‌تواند ISO آرچ را مستقیم بسازد — از WSL2 با توزیع Arch یا `build.ps1` با Docker Desktop
 استفاده کنید.
@@ -191,7 +209,7 @@ docker run --rm --privileged \
 | `install.sh` / `install-mac.sh` / `install.ps1` | نصب یک‌دستوری برای لینوکس، مک و ویندوز |
 | `you.py` | رندر وکتور فروهر (فقط به‌عنوان داده، parse می‌شود) |
 | `faravahar.png` | لوگویی که پشت نوار پیشرفت کشیده می‌شود |
-| `profile/packages.x86_64` | بسته‌های اضافی که به پروفایل ArchISO ادغام می‌شوند |
+| `profile/packages/*.list` | برای هر بخش یک فایل جدا — `base`، `desktop`، `apps`، `fonts`، `fonts-cjk`، `drivers-amd`، `drivers-intel`، `drivers-nvidia`، `gaming-32bit` — و `build.sh` فقط گروه‌های انتخاب‌شده را ادغام می‌کند |
 | `profile/airootfs/` | فایل‌های داخل ایمیج زنده (Hyprland، Waybar، ورود خودکار، setup) |
 | `build.sh` / `build.ps1` | ساخت تکرارپذیر ISO داخل Docker |
 | `run-windows.sh` | بوت ISO ساخته‌شده در QEMU از Git Bash |

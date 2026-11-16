@@ -29,7 +29,29 @@ for path in "${BUILD_DIR}" "${PROFILE_WORK}" "${WORK_DIR}" "${OUT_DIR}"; do
     [[ ! -L "${path}" ]] || fail "Refusing to use a symlink as a build/output directory: ${path}"
 done
 [[ -d "${PROFILE_SOURCE}/airootfs" ]] || fail "Prime-OS profile files are missing."
-[[ -f "${PROFILE_SOURCE}/packages.x86_64" ]] || fail "Prime-OS package list is missing."
+[[ -d "${PROFILE_SOURCE}/packages" ]] || fail "Prime-OS package groups are missing."
+
+# === package groups =========================================================
+# Every part of the system is its own list under profile/packages, so an image
+# can be built without dragging everything in. Pick the groups with
+# PRIME_OS_GROUPS="base desktop apps" (or "all"), separated by spaces.
+PACKAGE_DIR="${PROFILE_SOURCE}/packages"
+DEFAULT_GROUPS="base desktop apps fonts drivers-amd drivers-intel"
+ALL_GROUPS="base desktop apps fonts fonts-cjk drivers-amd drivers-intel drivers-nvidia gaming-32bit"
+PACKAGE_GROUPS="${PRIME_OS_GROUPS:-${DEFAULT_GROUPS}}"
+[[ "${PACKAGE_GROUPS}" == "all" ]] && PACKAGE_GROUPS="${ALL_GROUPS}"
+
+AVAILABLE_GROUPS="$(cd -- "${PACKAGE_DIR}" && ls -- *.list 2>/dev/null | sed 's/\.list$//' | tr '\n' ' ')"
+for group in ${PACKAGE_GROUPS}; do
+    [[ -f "${PACKAGE_DIR}/${group}.list" ]] \
+        || fail "Unknown package group '${group}'. Available: ${AVAILABLE_GROUPS}"
+done
+# base is never optional: the live session cannot boot without it.
+case " ${PACKAGE_GROUPS} " in
+    *" base "*) ;;
+    *) PACKAGE_GROUPS="base ${PACKAGE_GROUPS}" ;;
+esac
+printf 'Package groups: %s\n' "${PACKAGE_GROUPS}"
 
 mkdir -p -- "${BUILD_DIR}" "${OUT_DIR}"
 rm -rf -- "${PROFILE_WORK}"
@@ -37,21 +59,33 @@ mkdir -p -- "${PROFILE_WORK}" "${WORK_DIR}"
 cp -a /usr/share/archiso/configs/releng/. "${PROFILE_WORK}/"
 cp -a "${PROFILE_SOURCE}/airootfs/." "${PROFILE_WORK}/airootfs/"
 
-cat /usr/share/archiso/configs/releng/packages.x86_64 \
-    "${PROFILE_SOURCE}/packages.x86_64" \
-    | awk 'NF && !seen[$0]++' > "${PROFILE_WORK}/packages.x86_64"
+{
+    # The releng list pulls the linux-firmware meta package, which drags in the
+    # firmware of every vendor (~276 MiB). Each group names the firmware it
+    # actually needs, so drop the meta and keep the modular pieces.
+    grep -v -x 'linux-firmware' /usr/share/archiso/configs/releng/packages.x86_64
+    for group in ${PACKAGE_GROUPS}; do
+        printf '# --- group: %s ---\n' "${group}"
+        sed -e 's/#.*//' -e 's/[[:space:]]*$//' "${PACKAGE_DIR}/${group}.list"
+    done
+} | awk 'NF && !seen[$0]++' > "${PROFILE_WORK}/packages.x86_64"
+printf '%s\n' "${PACKAGE_GROUPS}" > "${OUT_DIR}/groups.txt"
 chmod 0755 \
     "${PROFILE_WORK}/airootfs/root/.automated_script.sh" \
     "${PROFILE_WORK}/airootfs/usr/local/bin/prime-os-live-setup"
 
-# Steam is in multilib; enable it only in this temporary build profile.
-PACMAN_CONF="${PROFILE_WORK}/pacman.conf"
-if grep -q '^#\[multilib\]' "${PACMAN_CONF}"; then
-    sed -i \
-        '/^#\[multilib\]/,/^#Include = \/etc\/pacman.d\/mirrorlist/ s/^#//' \
-        "${PACMAN_CONF}"
-elif ! grep -q '^\[multilib\]' "${PACMAN_CONF}"; then
-    fail "Could not find the multilib section in Arch's pacman.conf."
+# 32-bit packages come from multilib; enable it only when that group is built,
+# and only in this temporary build profile.
+if [[ " ${PACKAGE_GROUPS} " == *" gaming-32bit "* ]]; then
+    PACMAN_CONF="${PROFILE_WORK}/pacman.conf"
+    if grep -q '^#\[multilib\]' "${PACMAN_CONF}"; then
+        sed -i \
+            '/^#\[multilib\]/,/^#Include = \/etc\/pacman.d\/mirrorlist/ s/^#//' \
+            "${PACMAN_CONF}"
+    elif ! grep -q '^\[multilib\]' "${PACMAN_CONF}"; then
+        fail "Could not find the multilib section in Arch's pacman.conf."
+    fi
+    printf 'multilib enabled for the 32-bit gaming group.\n'
 fi
 
 PROFILE_DEF="${PROFILE_WORK}/profiledef.sh"
@@ -74,4 +108,5 @@ if [[ "${ISO}" != "${OUT_DIR}/os.iso" ]]; then
 fi
 
 printf '\nBuild complete: %s\n' "${OUT_DIR}/os.iso"
+printf 'Groups in this image: %s\n' "${PACKAGE_GROUPS}"
 printf 'Test the ISO in a virtual machine before using it on physical hardware.\n'

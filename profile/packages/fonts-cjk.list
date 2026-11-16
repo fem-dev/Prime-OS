@@ -1,0 +1,4 @@
+# Group: fonts-cjk (optional)
+# Chinese, Japanese and Korean glyphs. ~189 MiB compressed: enable it only when
+# those scripts are needed.
+noto-fonts-cjk

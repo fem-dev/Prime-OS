@@ -166,9 +166,27 @@ docker run --rm --privileged \
   bash -lc 'pacman -Syu --noconfirm archiso && bash ./build.sh'
 ```
 
+Nothing is bundled by default that you did not ask for: the image is assembled from
+the groups in `profile/packages/`. The default set is `base desktop apps fonts
+drivers-amd drivers-intel`, which leaves out the NVIDIA stack, the 32-bit gaming
+libraries and the CJK fonts (roughly 2.4 GiB → about 1.6 GiB). Add what you want:
+
+```bash
+# everything, including NVIDIA, 32-bit libs and CJK fonts
+docker run --rm --privileged -e PRIME_OS_BUILD_CONTAINER=1 \
+  -e PRIME_OS_GROUPS=all -v "$PWD:/work" -w /work archlinux:latest \
+  bash -lc 'pacman -Syu --noconfirm archiso && bash ./build.sh'
+
+# only what a specific machine needs
+-e PRIME_OS_GROUPS="base desktop apps fonts drivers-nvidia"
+```
+
+`base` is always included, an unknown group stops the build with the list of
+available ones, and the chosen groups are recorded in `out/groups.txt`.
+
 `build.sh` refuses to run outside an explicitly marked Arch container, copies the installed official
 releng profile into `.build/profile`, enables the `multilib` repository for Steam **in that temporary
-profile only**, merges `profile/packages.x86_64`, and writes the result to `out/os.iso`.
+profile only**, merges only the selected group lists from `profile/packages/`, and writes the result to `out/os.iso`.
 
 Windows cannot build an Arch ISO directly — use WSL2 with an Arch distribution, or `build.ps1` with
 Docker Desktop.
@@ -192,7 +210,7 @@ release asset; the workflow warns and skips publication instead of failing the b
 | `install.sh` / `install-mac.sh` / `install.ps1` | One-command bootstrap for Linux, macOS and Windows |
 | `you.py` | Faravahar vector renderer (shipped as data, parsed but not executed) |
 | `faravahar.png` | Logo drawn behind the progress bar |
-| `profile/packages.x86_64` | Extra packages merged into the ArchISO profile |
+| `profile/packages/*.list` | One list per component — `base`, `desktop`, `apps`, `fonts`, `fonts-cjk`, `drivers-amd`, `drivers-intel`, `drivers-nvidia`, `gaming-32bit` — and `build.sh` merges only the selected groups |
 | `profile/airootfs/` | Files placed in the live image (Hyprland, Waybar, autologin, setup) |
 | `build.sh` / `build.ps1` | Reproducible ISO build inside Docker |
 | `run-windows.sh` | Boot the built ISO in QEMU from Git Bash |

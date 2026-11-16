@@ -1,0 +1,4 @@
+# Group: drivers-amd
+# AMD Radeon: Mesa userspace plus the Vulkan driver.
+mesa
+vulkan-radeon

@@ -1,0 +1,4 @@
+# Group: apps
+# Graphical applications a first boot should have.
+firefox
+geany

@@ -122,7 +122,7 @@ docker run --rm --privileged \\
   bash -lc 'pacman -Syu --noconfirm archiso && bash ./build.sh'
 ```
 
-`build.sh` refuse de s'exécuter en dehors d'un conteneur Arch explicitement marcado, copie o perfil releng officiel dans `.build/profile`, active o repositório `multilib` pour Steam **uniquement neste perfil temporário**, fusiona `profile/packages.x86_64`, e escreve o resultado em `out/os.iso`.
+`build.sh` refuse de s'exécuter en dehors d'un conteneur Arch explicitement marcado, copie o perfil releng officiel dans `.build/profile`, active o repositório `multilib` pour Steam **uniquement neste perfil temporário**, fusiona `profile/packages/`, e escreve o resultado em `out/os.iso`.
 
 Windows ne peut pas construire uma ISO Arch directly — utilisez WSL2 avec uma distribuição Arch, ou `build.ps1` avec Docker Desktop.
 
@@ -142,7 +142,7 @@ Pousser um tag `v*` fait la même chose. Rien n'a a ser construit sur sua própr
 | `install.sh` / `install.ps1` | Bootstrap em uma comando para Linux/macOS e Windows |
 | `you.py` | Rendeur vectoriel Faravahar (fournit en dados, parsé mas não executado) |
 | `faravahar.png` | Logo usado pelo wizard e live session |
-| `profile/packages.x86_64` | Pacotes adicionais fusionados no perfil ArchISO |
+| `profile/packages/*.list` | Uma lista por componente (base, desktop, drivers-nvidia, …); o `build.sh` junta apenas os grupos escolhidos |
 | `profile/airootfs/` | Fichiers dans l'image live (Hyprland, Waybar, autologin, setup) |
 | `build.sh` / `build.ps1` | Construction ISO reproductível dans Docker |
 | `run-windows.sh` | Boot l'ISO construite dans QEMU depuis Git Bash |

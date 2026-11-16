@@ -146,7 +146,7 @@ docker run --rm --privileged \
 
 `build.sh` weigert sich außerhalb eines ausdrücklich markierten Arch-Containers zu laufen, kopiert das
 offizielle releng-Profil nach `.build/profile`, aktiviert das `multilib`-Repository für Steam **nur in
-diesem temporären Profil**, führt `profile/packages.x86_64` zusammen und schreibt das Ergebnis nach
+diesem temporären Profil**, führt `profile/packages/` zusammen und schreibt das Ergebnis nach
 `out/os.iso`.
 
 Windows kann eine Arch-ISO nicht direkt bauen – nutze WSL2 mit einer Arch-Distribution oder
@@ -170,7 +170,7 @@ Codespace eignet sich für interaktive Tests mit demselben Docker-Befehl.
 | `install.sh` / `install.ps1` | Ein-Befehl-Installation für Linux/macOS und Windows |
 | `you.py` | Vektor-Renderer für den Faravahar (als Datum ausgeliefert: geparst, nicht ausgeführt) |
 | `faravahar.png` | Logo des Assistenten und der Live-Sitzung |
-| `profile/packages.x86_64` | Zusätzliche Pakete, die ins archiso-Profil eingemischt werden |
+| `profile/packages/*.list` | Eine Liste pro Komponente (base, desktop, drivers-nvidia, …); `build.sh` führt nur die gewählten Gruppen zusammen |
 | `profile/airootfs/` | Dateien im Live-Image (Hyprland, Waybar, Autologin, Setup) |
 | `build.sh` / `build.ps1` | Reproduzierbarer ISO-Build in Docker |
 | `run-windows.sh` | Startet die gebaute ISO in QEMU aus der Git Bash |

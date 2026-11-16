@@ -134,7 +134,7 @@ docker run --rm --privileged \
 
 يرفض `build.sh` العمل خارج حاوية Arch مُعلَّمة صراحةً، وينسخ ملف تعريف releng الرسمي إلى
 `.build/profile`، ويُفعّل مستودع `multilib` لـ Steam في ذلك الملف المؤقت فقط، ويدمج
-`profile/packages.x86_64`، ويكتب الناتج في `out/os.iso`.
+`profile/packages/`، ويكتب الناتج في `out/os.iso`.
 
 لا يستطيع Windows بناء ISO لـ Arch مباشرة — استخدم WSL2 مع توزيعة Arch أو `build.ps1` مع Docker Desktop.
 
@@ -156,7 +156,7 @@ docker run --rm --privileged \
 | `install.sh` / `install.ps1` | تثبيت بأمر واحد لـ Linux/macOS وWindows |
 | `you.py` | مُصيّر الفَرَوَهَري المتّجهي (يُشحن كبيانات، يُحلَّل ولا يُنفَّذ) |
 | `faravahar.png` | الشعار المستخدم في المعالج وفي الجلسة الحيّة |
-| `profile/packages.x86_64` | حزم إضافية تُدمج في ملف archiso |
+| `profile/packages/*.list` | قائمة لكل مكوّن (base، desktop، drivers-nvidia، …) و`build.sh` يدمج المجموعات المختارة فقط |
 | `profile/airootfs/` | ملفات داخل الصورة الحيّة (Hyprland، Waybar، الدخول التلقائي، سكربت الإعداد) |
 | `build.sh` / `build.ps1` | بناء ISO قابل للتكرار داخل Docker |
 | `run-windows.sh` | إقلاع ISO المبني في QEMU من Git Bash |
