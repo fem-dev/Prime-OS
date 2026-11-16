@@ -214,24 +214,47 @@ request.
 
 ---
 
-## 9. Release upload fails with HTTP 422 (asset too large)
+## 9. The image is larger than 2 GiB (GitHub's asset limit)
 
-**Symptom.** The build succeeds, the release step fails:
+**Symptom.** The build succeeds, but nothing appears on the release. Before the
+fix, the log said:
 
 ```
 Validation Failed: {"resource":"ReleaseAsset","code":"custom","message":"size must be less than 2147483648"}
 ```
 
-**Cause.** GitHub rejects release assets of 2 GiB or more. A full Arch ISO with
-Steam, Lutris and a fat driver set easily crosses that.
+**Cause.** GitHub refuses a release asset of 2 GiB or more, and the live image is
+currently **~2.4 GiB**, so the old workflow skipped publication entirely — which
+is why the wizard kept saying "No Prime-OS release has been published yet" even
+though every build was green.
 
-**Fix.** Keep the image under 2 GiB — cut packages in `profile/packages.x86_64`
-(a live preview does not need every gaming package), or publish the ISO somewhere
-that allows large files and keep the release for checksums only. The workflow now
-checks the size first and skips publication with an explicit message instead of
-failing halfway.
+**Fix (in the workflow).** A large image is published as numbered parts plus one
+small manifest:
 
----
+```
+os.iso.part01   1700 MiB
+os.iso.part02    remainder
+os-iso-parts.json   {size, sha256 of the joined file, every part's size + sha256}
+```
+
+`write_parts_manifest.py` writes the manifest, and the publish step also deletes
+the assets of the other layout (`os.iso` when it now ships parts, or the parts
+when it fits in one file) so the wizard can never pick a stale image.
+
+**Fix (in the wizard).** `loader.py` prefers a single `os.iso`; when there is
+none it reads `os-iso-parts.json`, downloads the parts in order into one file,
+verifies **each part** against its own SHA-256, verifies the **joined** file
+against the manifest, then moves it into place. A user can also join by hand:
+
+```bash
+cat os.iso.part* > os.iso
+sha256sum os.iso    # must equal the manifest's sha256
+```
+
+**Why not the Actions artifact instead?** The artifact `prime-os-iso` is exactly
+where the ISO sits after a build, but GitHub only lets signed-in users with read
+access download artifacts, and they expire after 90 days. A wizard that cannot
+log in cannot use them, so the release stays the public distribution channel.
 
 ## 10. `rm: cannot remove '.build/work/...': Permission denied` in CI
 

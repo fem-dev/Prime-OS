@@ -141,52 +141,64 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Conditionally publish the release
-        # Only publish to release if ISO size is within GitHub 2GiB asset limit.
-        # Otherwise, skip release creation and keep artifact for manual download.
+      - name: Publish the image (single asset or parts)
+        # GitHub refuses a release asset of 2 GiB or more and the live image is
+        # larger than that, which is why nothing was ever published. A large image
+        # is now published as numbered parts plus one small manifest that the setup
+        # wizard reads and joins, so the download needs no external hosting.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get actual ISO size in bytes
-          if [ -f out/os.iso ]; then
-            ISO_BYTES=$(stat -c%s out/os.iso)
-          else
-            ISO_BYTES=0
-          fi
+          set -euo pipefail
           TAG="${TAG:-os-preview}"
-          PRERELEASE="${PRERELEASE_INPUT:-true}"
-
-          # Default to prerelease unless explicitly set to false
           PRERELEASE_FLAG="--prerelease"
-          if [ "$PRERELEASE" = "false" ]; then
-            PRERELEASE_FLAG=""
-          fi
+          if [ "${PRERELEASE_INPUT:-true}" = "false" ]; then PRERELEASE_FLAG=""; fi
 
-          # GitHub release asset limit is 2 GiB (2147483648 bytes)
           MAX_ASSET_BYTES=2147483648
+          ISO_BYTES=$(stat -c%s out/os.iso)
+          FULL_SHA=$(cut -d' ' -f1 out/os.iso.sha256)
+          rm -rf upload && mkdir -p upload
 
-          if [ "$ISO_BYTES" -le "$MAX_ASSET_BYTES" ] && [ "$ISO_BYTES" -gt 0 ]; then
-            # ISO is small enough - proceed with release creation/upload
-            if gh release view "$TAG" >/dev/null 2>&1; then
-              gh release upload "$TAG" out/os.iso out/os.iso.sha256 --clobber
-            else
-              gh release create "$TAG" out/os.iso out/os.iso.sha256 \
-                --title "Prime-OS $TAG" \
-                --notes "Prime-OS live image, built by GitHub Actions. Verify with: sha256sum -c os.iso.sha256" \
-                $PRERELEASE_FLAG
-            fi
-            echo "Release $TAG published successfully with ISO asset ($((ISO_BYTES / 1024 / 1024)) MiB)" >> "$GITHUB_STEP_SUMMARY"
-            gh release view "$TAG" --json assets --jq '.assets[].name' >> "$GITHUB_STEP_SUMMARY" || true
-          elif [ "$ISO_BYTES" -eq 0 ]; then
-            echo "::error::ISO file not found (out/os.iso missing), cannot publish release."
-            exit 1
+          if [ "$ISO_BYTES" -lt "$MAX_ASSET_BYTES" ]; then
+            echo "Image is $((ISO_BYTES / 1024 / 1024)) MiB: publishing one asset."
+            cp out/os.iso upload/os.iso
+            cp out/os.iso.sha256 upload/os.iso.sha256
+            MODE=single
           else
-            # ISO too large for GitHub release assets - skip release creation
-            echo "::warning::ISO size ($((ISO_BYTES / 1024 / 1024)) MiB) exceeds GitHub 2 GiB release asset limit."
-            echo "ISO is too large for GitHub Release asset. Artifacts are still available for manual download." >> "$GITHUB_STEP_SUMMARY"
-            echo "To publish this ISO, consider:" >> "$GITHUB_STEP_SUMMARY"
-            echo "1. Creating a release manually outside of GitHub Actions" >> "$GITHUB_STEP_SUMMARY"
-            echo "2. Using external file hosting (e.g., transfer.sh)" >> "$GITHUB_STEP_SUMMARY"
-            echo "3. Reducing ISO size by removing packages from profile/packages.x86_64" >> "$GITHUB_STEP_SUMMARY"
-            echo "The ISO and checksum are available as artifacts for download." >> "$GITHUB_STEP_SUMMARY"
+            echo "Image is $((ISO_BYTES / 1024 / 1024)) MiB: publishing parts."
+            split -b 1700M -d -a 2 --numeric-suffixes=1 out/os.iso upload/os.iso.part
+            python3 .github/scripts/write_parts_manifest.py upload "$ISO_BYTES" "$FULL_SHA"
+            MODE=parts
           fi
+          ls -lh upload/
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" upload/* --clobber
+          else
+            gh release create "$TAG" upload/* \
+              --title "Prime-OS $TAG" \
+              --notes "Prime-OS live image, built by GitHub Actions. Verify with: sha256sum -c os.iso.sha256" \
+              $PRERELEASE_FLAG
+          fi
+
+          # Remove the assets of the other layout so the wizard can never pick a
+          # stale copy of the image.
+          if [ "$MODE" = parts ]; then
+            for stale in os.iso os.iso.sha256; do
+              gh release delete-asset "$TAG" "$stale" -y >/dev/null 2>&1 || true
+            done
+          else
+            for stale in $(gh release view "$TAG" --json assets --jq '.assets[].name' \
+                | grep '^os\.iso\.part' || true); do
+              gh release delete-asset "$TAG" "$stale" -y >/dev/null 2>&1 || true
+            done
+            gh release delete-asset "$TAG" os-iso-parts.json -y >/dev/null 2>&1 || true
+          fi
+
+          {
+            echo "### Published $TAG ($MODE)"
+            echo "- image: $((ISO_BYTES / 1024 / 1024)) MiB"
+            echo "- sha256: \`$FULL_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          gh release view "$TAG" --json assets \
+            --jq '.assets[] | "- \(.name) \(.size) B"' >> "$GITHUB_STEP_SUMMARY" || true

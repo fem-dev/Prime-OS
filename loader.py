@@ -18,6 +18,7 @@ import io
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import threading
@@ -218,6 +219,92 @@ def pick_iso_asset(release: dict) -> IsoAsset | None:
         size=size,
         checksum_url=checksum_url,
     )
+
+
+PART_MANIFEST_NAME = "os-iso-parts.json"
+
+
+@dataclass(frozen=True)
+class IsoPart:
+    """One numbered piece of an image published as parts."""
+
+    name: str
+    url: str
+    size: int
+    sha256: str | None = None
+
+
+@dataclass(frozen=True)
+class IsoParts:
+    """A whole image published as parts, plus the digest of the joined file."""
+
+    size: int
+    sha256: str | None
+    parts: tuple[IsoPart, ...]
+
+
+def pick_parts_asset(release: dict) -> dict | None:
+    """The manifest asset of an image published as parts, if the release has one."""
+    for asset in release.get("assets") or []:
+        if isinstance(asset, dict) and str(asset.get("name", "")) == PART_MANIFEST_NAME:
+            return asset
+    return None
+
+
+def safe_part_name(name: str) -> str:
+    """Parts are named os.iso.partNN; nothing else may reach the filesystem."""
+    if not re.fullmatch(r"os\.iso\.part[0-9]{1,4}", name):
+        raise ValueError(f"Unsafe or unexpected part name: {name!r}")
+    return name
+
+
+def parse_parts_manifest(manifest: dict, release: dict) -> IsoParts:
+    """Turn a parts manifest into the ordered list of downloads."""
+    by_name = {
+        str(asset.get("name", "")): asset
+        for asset in release.get("assets") or []
+        if isinstance(asset, dict)
+    }
+    entries = manifest.get("parts")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("The parts manifest does not list any parts")
+    parts: list[IsoPart] = []
+    total = 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("Malformed part entry in the parts manifest")
+        name = safe_part_name(str(entry.get("name", "")))
+        asset = by_name.get(name)
+        if asset is None:
+            raise ValueError(f"The release is missing the part {name}")
+        url = str(asset.get("browser_download_url", ""))
+        if not is_allowed_github_url(url):
+            raise ValueError(f"The part {name} is not an allowed Prime-OS HTTPS URL")
+        try:
+            size = int(entry.get("size") or asset.get("size") or 0)
+        except (TypeError, ValueError):
+            size = 0
+        digest = entry.get("sha256")
+        parts.append(IsoPart(name, url, max(0, size), digest if isinstance(digest, str) else None))
+        total += max(0, size)
+    declared = manifest.get("size")
+    size = declared if isinstance(declared, int) and declared > 0 else total
+    whole = manifest.get("sha256")
+    return IsoParts(size, whole if isinstance(whole, str) else None, tuple(parts))
+
+
+def fetch_parts_manifest(asset: dict) -> dict:
+    """Read the small manifest that describes the parts of a release."""
+    url = str(asset.get("browser_download_url", ""))
+    if not is_allowed_github_url(url):
+        raise ValueError("The parts manifest is not an allowed Prime-OS HTTPS URL")
+    request = urllib.request.Request(url, headers={"User-Agent": "Prime-OS-Setup"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        raw = response.read(64 * 1024)
+    payload = json.loads(raw.decode("utf-8", "replace"))
+    if not isinstance(payload, dict):
+        raise ValueError("The parts manifest is not a JSON object")
+    return payload
 
 
 def expected_digest(checksum_text: str, filename: str) -> str | None:
@@ -566,13 +653,20 @@ class PrimeSetup:
             self.release = release
             self.release_checked = True
             asset = pick_iso_asset(release)
-            if asset is None:
+            if asset is not None:
+                self.root.after(0, lambda: self._start_download(asset))
+                return
+            manifest_asset = pick_parts_asset(release)
+            if manifest_asset is None:
                 self.root.after(0, lambda: self._release_missing(
                     "The repository has no published ISO yet. The setup wizard works in "
                     "preview mode; it will not pretend to install an OS."
                 ))
                 return
-            self.root.after(0, lambda: self._start_download(asset))
+            # A large image is published as numbered parts; the manifest says how
+            # they join and what digest the joined file must have.
+            bundle = parse_parts_manifest(fetch_parts_manifest(manifest_asset), release)
+            self.root.after(0, lambda: self._start_parts_download(bundle))
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 message = (
@@ -619,6 +713,81 @@ class PrimeSetup:
             args=(asset, image_url, checksum_url),
             daemon=True,
         ).start()
+
+    def _start_parts_download(self, bundle: IsoParts) -> None:
+        self.status.set(
+            f"Downloading os.iso in {len(bundle.parts)} parts from GitHub releases…"
+        )
+        self.logo_hint.configure(text="The Faravahar fills with the real download progress")
+        APP_DIR.mkdir(parents=True, exist_ok=True)
+        self.download_path = APP_DIR / "os.iso"
+        threading.Thread(
+            target=self._download_parts_worker, args=(bundle,), daemon=True
+        ).start()
+
+    def _download_parts_worker(self, bundle: IsoParts) -> None:
+        destination = self.download_path
+        assert destination is not None
+        temporary = destination.with_suffix(".iso.joining")
+        total = bundle.size or sum(part.size for part in bundle.parts)
+        written = 0
+        overall = hashlib.sha256()
+        try:
+            with temporary.open("wb") as output:
+                for index, part in enumerate(bundle.parts, start=1):
+                    if not is_allowed_github_url(part.url):
+                        raise ValueError(f"{part.name} is not an allowed Prime-OS HTTPS URL")
+                    self.root.after(
+                        0,
+                        lambda i=index, n=part.name: self.status.set(
+                            f"Downloading part {i} of {len(bundle.parts)} ({n})…"
+                        ),
+                    )
+                    request = urllib.request.Request(
+                        part.url,
+                        headers={"User-Agent": "Prime-OS-Setup",
+                                 "Accept": "application/octet-stream"},
+                    )
+                    part_digest = hashlib.sha256()
+                    with urllib.request.urlopen(request, timeout=30) as response:
+                        while True:
+                            chunk = response.read(CHUNK_SIZE)
+                            if not chunk:
+                                break
+                            output.write(chunk)
+                            part_digest.update(chunk)
+                            overall.update(chunk)
+                            written += len(chunk)
+                            if written > MAX_ISO_BYTES:
+                                raise IOError(
+                                    f"Download exceeded the {MAX_ISO_BYTES // 1024 ** 3} GiB "
+                                    "safety limit"
+                                )
+                            share = written / total if total else 0.0
+                            self.root.after(
+                                0,
+                                lambda p=share, d=written, t=total: self._download_progress(
+                                    p, d, t
+                                ),
+                            )
+                    if part.sha256 and part_digest.hexdigest() != part.sha256.lower():
+                        raise ValueError(f"{part.name} is corrupted (SHA-256 mismatch)")
+            if bundle.sha256 and overall.hexdigest() != bundle.sha256.lower():
+                raise ValueError("SHA-256 checksum mismatch: the joined image is corrupted")
+            os.replace(temporary, destination)
+            self.download_verified = bool(bundle.sha256)
+            self.root.after(
+                0,
+                lambda: self._download_complete(IsoAsset(name="os.iso", url="", size=total)),
+            )
+        except Exception as exc:  # noqa: BLE001 - surfaced in the window
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+            self.root.after(0, lambda error=str(exc): self._release_missing(
+                f"ISO download failed: {error}. Check the connection and try again."
+            ))
 
     def _download_worker(
         self, asset: IsoAsset, image_url: str, checksum_url: str | None

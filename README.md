@@ -128,7 +128,7 @@ reason and the fix. The short version:
 | `Could not download loader.py from GitHub` | No route to GitHub | Turn a VPN on — or off if one is already on — and retry |
 | `Python 3 is required` / `no Tk support` | Python or Tk missing | Install Python 3 with Tk, reopen the terminal |
 | `No Prime-OS release has been published yet` | No release exists | Expected: the wizard saves a profile only |
-| Release upload fails (HTTP 422) | ISO ≥ 2 GiB, GitHub's asset limit | Reduce `profile/packages.x86_64` or host the image elsewhere |
+| Image is larger than 2 GiB | GitHub refuses a single asset that big | The workflow publishes it as numbered parts; the wizard downloads and joins them |
 
 ## Integrity and safety
 
