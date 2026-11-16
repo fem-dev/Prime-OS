@@ -18,13 +18,13 @@ trap {
 # Pinned source. The four files are fetched from this exact commit, never from
 # the moving "main" branch, so the hashes below always describe what arrives.
 # Refreshed together with $expectedHashes in the same commit.
-$pinnedCommit = '3c2afc643c71f0dff323849d40a719ea0f6c8ed0'
+$pinnedCommit = '082d90706268760914c47ec5f7aebfde0b965840'
 $rawBase = "https://raw.githubusercontent.com/fem-dev/Prime-OS/$pinnedCommit"
 
 # Pinned SHA-256 of every file this installer copies. Keep in sync with
 # install.sh, install-mac.sh and loader.py whenever the sources change.
 $expectedHashes = @{
-    'loader.py'        = '2A544368C4907D720761722BF2D6F48DEF54FA48C82B3C9DC1298319073B0117'
+    'loader.py'        = '2F5241BAEA3551AB671AEBAF64E7FE1D9988020981A26EF46C4505A683BA1E08'
     'faravahar.png'    = '7A2650C3A71E26E70DEF9E841BB3105756B246C9FBCE64DE719F0B1642FD472E'
     'you.py'           = '870972D63ACC13B13EB2FFE44420C7E01A8366064E1EBF7AC7A6D6859CA22A36'
     'requirements.txt' = 'B4506838C7BE3C862AC0DA2886CDF9DC7DC056F8C25EDF5D47038803AC21AE9A'
