@@ -7,6 +7,8 @@ linux
 mkinitcpio
 # archiso's mkinitcpio hooks: without this the live initramfs cannot be built.
 mkinitcpio-archiso
+# mkarchiso refuses to build a profile whose BIOS boot mode has no syslinux.
+syslinux
 pacman
 dialog
 arch-install-scripts
