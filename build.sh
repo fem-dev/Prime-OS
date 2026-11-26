@@ -72,6 +72,22 @@ if [[ "${#MISSING[@]}" -gt 0 ]]; then
     log "skipping packages the mirrors do not have: ${MISSING[*]}"
 fi
 
+# The firmware packages were split and renamed more than once. If most of the
+# vendor names above are gone, fall back to the meta package: an installer with
+# no firmware for the network card cannot install anything at all.
+FIRMWARE_COUNT=0
+for pkg in "${PACKAGES[@]}"; do
+    case "${pkg}" in linux-firmware-*) FIRMWARE_COUNT=$((FIRMWARE_COUNT + 1)) ;; esac
+done
+if [[ "${FIRMWARE_COUNT}" -lt 3 ]]; then
+    if pacman -Si linux-firmware >/dev/null 2>&1; then
+        log "vendor firmware names are gone: adding the linux-firmware meta package"
+        PACKAGES+=("linux-firmware")
+    else
+        fail "Neither vendor firmware packages nor linux-firmware exist; this mirror looks wrong."
+    fi
+fi
+
 # === work profile ===========================================================
 log "preparing the build profile"
 mkdir -p -- "${BUILD_DIR}" "${OUT_DIR}"
