@@ -1,32 +1,54 @@
+/* Prime-OS Waybar — Persepolis palette (branding/palette.json) */
 * {
   font-family: "Noto Sans", sans-serif;
   font-size: 11px;
+  font-weight: 500;
   min-height: 0;
 }
 
 window#waybar {
-  background: rgba(10, 14, 24, 0.9);
-  color: #d1d5db;
-  border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+  background: rgba(20, 33, 61, 0.96);   /* lapis */
+  color: #EFE6D2;                        /* ivory */
+  border-bottom: 2px solid #D4A537;      /* gold frieze rule */
 }
 
 #workspaces button {
-  color: #6b7280;
-  padding: 0 6px;
-  border-radius: 6px;
-  margin: 0 2px;
+  color: #8E9BB5;
+  padding: 0 8px;
+  margin: 3px 2px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+}
+
+#workspaces button:hover {
+  color: #EFE6D2;
+  border-color: #24406B;
 }
 
 #workspaces button.active {
-  color: #ffffff;
-  background: #1e293b;
+  color: #0B1020;
+  background: #D4A537;                   /* gold insert, like glazed brick */
+}
+
+#custom-brand {
+  color: #F0C75E;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 0 12px 0 10px;
+  margin: 3px 0;
+  border-right: 1px solid #24406B;
 }
 
 #clock, #cpu, #memory, #network, #pulseaudio, #tray, #window {
-  padding: 0 6px;
+  padding: 0 8px;
   margin: 0 2px;
+  color: #EFE6D2;
 }
 
-#clock { color: #a5f3cf; }
-#cpu, #memory { color: #60a5fa; }
-#network, #pulseaudio { color: #f87171; }
+#clock { color: #F0C75E; }
+#network { color: #3E7C6A; }
+#network.disconnected { color: #A6472F; }
+#pulseaudio { color: #D4A537; }
+#pulseaudio.muted { color: #A6472F; }
+#tray { color: #EFE6D2; }
+#window { color: #8E9BB5; }

@@ -65,15 +65,15 @@ else:
     )
     CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "prime-os"
 
-BG = "#090d18"
-PANEL = "#121a2a"
-PANEL_ACTIVE = "#1c2740"
-BORDER = "#22304a"
-BORDER_ACTIVE = "#a78bfa"
-ACCENT = "#a78bfa"
+BG = "#0B1020"                 # basalt
+PANEL = "#14213D"              # lapis
+PANEL_ACTIVE = "#1B2A4A"        # lapis, raised
+BORDER = "#24406B"             # lapis lift
+BORDER_ACTIVE = "#D4A537"        # gold
+ACCENT = "#F0C75E"              # gold bright
 GOLD = "#f2bb54"
-TEXT = "#f4f5fb"
-MUTED = "#a0abc0"
+TEXT = "#EFE6D2"                # ivory
+MUTED = "#8E9BB5"               # ivory, dimmed
 GHOST = "#2c3852"
 
 CHECKSUM_ASSET_NAMES = ("sha256sums.txt", "sha256sums", "checksums.txt", "sha256.txt")
@@ -450,8 +450,8 @@ class PrimeSetup:
         buttons.pack(pady=(0, 6))
         self.start_button = tk.Button(
             buttons, text="Start download", command=self._start_clicked,
-            bg="#6845c5", fg="white", activebackground="#8060df",
-            activeforeground="white", disabledforeground="#748099", relief="flat",
+            bg="#D4A537", fg="#0B1020", activebackground="#F0C75E",
+            activeforeground="#0B1020", disabledforeground="#748099", relief="flat",
             padx=22, pady=10,
         )
         self.start_button.pack(side="left", padx=6)
@@ -949,8 +949,8 @@ class PrimeSetup:
             fg=MUTED, bg=BG, wraplength=640, justify="left",
         ).pack(anchor="w", pady=12)
         tk.Button(
-            wrapper, text="Save profile", command=self._save_profile, bg="#6845c5",
-            fg="white", activebackground="#8060df", activeforeground="white",
+            wrapper, text="Save profile", command=self._save_profile, bg="#D4A537",
+            fg="#0B1020", activebackground="#F0C75E", activeforeground="#0B1020",
             relief="flat", padx=20, pady=10,
         ).pack(anchor="w", pady=8)
 
@@ -1002,8 +1002,8 @@ class PrimeSetup:
             justify="left",
         ).pack(anchor="w", pady=5)
         tk.Button(
-            wrapper, text="Close", command=self.root.destroy, bg="#6845c5", fg="white",
-            activebackground="#8060df", activeforeground="white", relief="flat",
+            wrapper, text="Close", command=self.root.destroy, bg="#D4A537", fg="#0B1020",
+            activebackground="#F0C75E", activeforeground="#0B1020", relief="flat",
             padx=20, pady=9,
         ).pack(anchor="w", pady=16)
 

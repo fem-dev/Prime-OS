@@ -1,11 +1,15 @@
 {
   "layer": "top",
   "position": "top",
-  "height": 30,
+  "height": 32,
   "spacing": 8,
-  "modules-left": ["hyprland/workspaces"],
+  "modules-left": ["custom/brand", "hyprland/workspaces", "hyprland/window"],
   "modules-center": ["clock"],
   "modules-right": ["pulseaudio", "network", "tray"],
+  "custom/brand": {
+    "format": "PRIME-OS",
+    "tooltip": false
+  },
   "hyprland/workspaces": {
     "format": "{name}",
     "on-click": "activate"

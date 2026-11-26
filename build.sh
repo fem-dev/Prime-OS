@@ -93,7 +93,7 @@ sed -i \
     -e 's|^iso_name=.*|iso_name="prime-os"|' \
     -e 's|^iso_label=.*|iso_label="PRIME_OS_$(date +%Y%m)"|' \
     -e 's|^iso_publisher=.*|iso_publisher="Prime-OS <https://github.com/fem-dev/Prime-OS>"|' \
-    -e 's|^iso_application=.*|iso_application="Prime-OS Gaming Live Environment"|' \
+    -e 's|^iso_application=.*|iso_application="Prime-OS Live"|' \
     "${PROFILE_DEF}"
 
 printf 'Building Prime-OS ISO (this downloads Arch packages)…\n'

@@ -7,5 +7,14 @@ xdg-desktop-portal-hyprland
 xdg-desktop-portal-gtk
 pipewire
 pipewire-alsa
+wireplumber
 alsa-utils
 pcmanfm
+kitty
+dunst
+swaybg
+libnotify
+dbus
+grim
+slurp
+pavucontrol

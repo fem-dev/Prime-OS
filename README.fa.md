@@ -1,5 +1,9 @@
 # پرایم‌اواس (Prime-OS)
 
+<img src="branding/hero.svg" alt="Prime-OS: ستون‌های هخامنشی و نشان بال‌دار، طلایی روی لاجورد" width="100%">
+
+*یک لینوکس گیمینگ با تناسبات تخت‌جمشید: آرام مثل سنگ، لاجورد و طلا، بدون هیچ هیاهو.*
+
 [English](README.md) · **فارسی** · [العربية](README.ar.md) · [Español](README.es.md) · [Deutsch](README.de.md)
 
 > [!CAUTION]

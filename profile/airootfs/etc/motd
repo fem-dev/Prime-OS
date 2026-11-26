@@ -1,0 +1,9 @@
+Prime-OS Live — preview release
+================================
+
+  Desktop   Hyprland on Wayland          Super+Enter  terminal
+  Files     pcmanfm                      Super+D      launcher
+  Browser   firefox                      Super+1..9   workspace
+
+  This lives in RAM only: a reboot returns to your installed system.
+  Report problems with your GPU model and driver version.

@@ -1,5 +1,9 @@
 # Prime-OS
 
+<img src="branding/hero.svg" alt="Prime-OS: an Achaemenid colonnade with a winged disc in gold on lapis" width="100%">
+
+*A gaming Linux built to the proportions of Persepolis: stone calm, lapis and gold, nothing shouting.*
+
 **English** · [Français](README.fr.md) · [العربية](README.ar.md) · [Español](README.es.md) · [Deutsch](README.de.md) · [Farsi](README.fa.md) · [Italiano](README.it.md) · [Português](README.po.md) · [Русский](README.ru.md) · [中文](README.zh.md)
 
 > [!CAUTION]
@@ -8,7 +12,8 @@
 > nothing is guaranteed to work, and a wrong drive selection or a misused tool can destroy data.
 
 **Prime-OS** is a community-built gaming Linux project based on **Arch Linux** and the
-[Hyprland](https://hyprland.org/) Wayland compositor. The current milestone is a **bootable live
+[Hyprland](https://hyprland.org/) Wayland compositor, with a visual language borrowed from
+Achaemenid Persepolis — see [branding/BRAND.md](branding/BRAND.md). The current milestone is a **bootable live
 ISO prototype** — not a finished installer and not a production-ready operating system.
 
 > [!IMPORTANT]
@@ -94,11 +99,34 @@ On Windows, `./run-windows.sh` boots `out/os.iso` from Git Bash (QEMU required).
 | --- | --- | --- | --- |
 | `Super + Enter` | Terminal (Kitty) | `Super + Q` | Close window |
 | `Super + D` | Application launcher (Wofi) | `Super + F` | Fullscreen |
-| `Super + B` | Firefox | `Super + V` | Toggle floating |
-| `Super + G` | Steam | `Super + P` / `Super + J` | Pseudo-tile / split |
-| `Super + N` | Network settings | `Super + M` | Exit Hyprland |
+| `Super + E` | File manager (pcmanfm) | `Super + N` | Network settings (nmtui) |
+| `Super + B` | Firefox | `Print` | Screenshot (grim + slurp) |
+| `Super + G` | Steam, if installed | `Super + P` / `Super + J` | Pseudo-tile / split |
+| `Super + V` | Toggle floating | `Super + M` | Exit Hyprland |
 | `Super + 1…9` | Switch workspace | `Super + Shift + 1…9` | Move window to workspace |
 | `Super + H/J/K/L` | Focus left/down/up/right | `Super + Shift + H/J/K/L` | Move window in that direction |
+
+## The look
+
+Prime-OS reads like the Achaemenid court: basalt and lapis fields, thin gold inserts, true
+verticals, no ornament that cannot be drawn with lines and arcs. The Faravahar in the setup window
+is the project mark; the live session opens on a colonnade with a winged disc.
+
+| Token | Hex | Where |
+| --- | --- | --- |
+| Basalt | `#0B1020` | Window background, terminal |
+| Lapis | `#14213D` | Panels, bars |
+| Gold | `#D4A537` | Active borders, the frieze rule under the Waybar |
+| Gold bright | `#F0C75E` | Focus, the revealed part of the mark |
+| Terracotta | `#A6472F` | Errors |
+| Ivory | `#EFE6D2` | Text |
+
+Everything is **English only** — including on the text console — and the identity carries no
+religious or state symbolism. The rules, the motifs and the voice live in
+[branding/BRAND.md](branding/BRAND.md); the tokens are machine-readable in
+[branding/palette.json](branding/palette.json).
+
+![Prime-OS live wallpaper](branding/wallpaper-preview.png)
 
 ## What the prototype contains
 
@@ -215,6 +243,7 @@ release asset; the workflow warns and skips publication instead of failing the b
 | `build.sh` / `build.ps1` | Reproducible ISO build inside Docker |
 | `run-windows.sh` | Boot the built ISO in QEMU from Git Bash |
 | `web_search.py` | Exa web search helper for contributors (`EXA_API_KEY`) |
+| `branding/` | Identity: `BRAND.md`, `palette.json`, the README hero and the wallpaper master |
 | `.gitattributes` | Forces LF everywhere so the pinned SHA-256 values stay stable |
 | `DOCS.md` | Developer error reference: symptom, cause, fix |
 | `NOTICE.md` | What the project is and is not: licensing, trademarks, safety, status |
