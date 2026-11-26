@@ -2,4 +2,4 @@
 # AMD Radeon: Mesa userspace, Vulkan and video decoding.
 mesa
 vulkan-radeon
-libva-mesa-driver
+# (video decoding moved into mesa itself)

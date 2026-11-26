@@ -5,6 +5,8 @@
 base
 linux
 mkinitcpio
+# archiso's mkinitcpio hooks: without this the live initramfs cannot be built.
+mkinitcpio-archiso
 pacman
 dialog
 arch-install-scripts
