@@ -28,7 +28,7 @@ Wayland **Hyprland** است. مرحلهٔ فعلی یک **ISO زندهٔ قاب�
 ### ویندوز (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/9d9e4850bc02ea14b5c97b1072e025f4dda01e5b/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986cb44ec78e48f748/install.ps1 | iex
 ```
 
 > [!TIP]
