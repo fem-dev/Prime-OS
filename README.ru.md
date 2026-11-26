@@ -1,5 +1,8 @@
 # Prime-OS
 
+> **Note:** this translation predates the setup-installer layout. The commands still work; the structure sections describe an older image. [README.md](README.md) is the reference.
+
+
 [English](README.md) · [Русский]· [العربية](README.ar.md) · [Español](README.es.md) · [Deutsch](README.de.md) · [Farsi](README.fa.md) · [Français](README.fr.md) · [Italiano](README.it.md) · [Português](README.po.md)
 
 > [!CAUTION]
@@ -122,7 +125,7 @@ docker run --rm --privileged \\
   bash -lc 'pacman -Syu --noconfirm archiso && bash ./build.sh'
 ```
 
-`build.sh` отказывается работать вне явно отмеченного Arch-контейнера, копирует официальный releng профиль в `.build/profile`, активирует репозиторий `multilib` для Steam **только в этом временном профиле**, объединяет `profile/packages/`, и пишет результат в `out/os.iso`.
+`build.sh` отказывается работать вне явно отмеченного Arch-контейнера, копирует официальный releng профиль в `.build/profile`, активирует репозиторий `multilib` для Steam **только в этом временном профиле**, объединяет `components/`, и пишет результат в `out/os.iso`.
 
 Windows не может построить ISO Arch directly — используйте WSL2 с distributions Arch, или `build.ps1` с Docker Desktop.
 
@@ -142,7 +145,7 @@ Windows не может построить ISO Arch directly — использ�
 | `install.sh` / `install.ps1` | Bootstrap в одну команду для Linux/macOS и Windows |
 | `you.py` | Vector Art Faravahar (поставляется в данных, парсится, но не выполняется) |
 | `faravahar.png` | Лого, используемый мастером и live-сессией |
-| `profile/packages/*.list` | Отдельный список для каждого компонента (base, desktop, drivers-nvidia, …); `build.sh` объединяет только выбранные группы |
+| `components/*.list` | Отдельный список для каждого компонента (base, desktop, drivers-nvidia, …); `build.sh` объединяет только выбранные группы |
 | `profile/airootfs/` | Файлы в live-образе (Hyprland, Waybar, autologin, setup) |
 | `build.sh` / `build.ps1` | Репродиуктивная сборка ISO в Docker |
 | `run-windows.sh` | Запуск ISO в QEMU из Git Bash |
@@ -152,7 +155,7 @@ Windows не может построить ISO Arch directly — использ�
 | `NOTICE.md` | Что проект есть и нет: лицензия, торги, безопасность, статус |
 | `.github/` | Workflow, который строит ISO и публикует его в релизы |
 
-Live-сессия запускается один раз на `tty1` через drop-in `getty` autologin плюс `/etc/skel/.bash_profile` ; `prime-os-live-setup` создает непривилегированного пользователя `prime` и устанавливает canonical `/etc/prime-os/hyprland.conf`.
+Live-сессия запускается один раз на `tty1` через drop-in `getty` autologin плюс `/etc/skel/.bash_profile` ; `prime-os-setup` создает непривилегированного пользователя `prime` и устанавливает canonical `/etc/prime-os/hyprland.conf`.
 
 ## Статус проекта
 

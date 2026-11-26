@@ -1,5 +1,8 @@
 # Prime-OS
 
+> **Note:** this translation predates the setup-installer layout. The commands still work; the structure sections describe an older image. [README.md](README.md) is the reference.
+
+
 [English](README.md) · [Português]· [العربية](README.ar.md) · [Español](README.es.md) · [Deutsch](README.de.md) · [Farsi](README.fa.md) · [Français](README.fr.md) · [Italiano](README.it.md)
 
 > [!CAUTION]
@@ -122,7 +125,7 @@ docker run --rm --privileged \\
   bash -lc 'pacman -Syu --noconfirm archiso && bash ./build.sh'
 ```
 
-`build.sh` refuse de s'exécuter en dehors d'un conteneur Arch explicitement marcado, copie o perfil releng officiel dans `.build/profile`, active o repositório `multilib` pour Steam **uniquement neste perfil temporário**, fusiona `profile/packages/`, e escreve o resultado em `out/os.iso`.
+`build.sh` refuse de s'exécuter en dehors d'un conteneur Arch explicitement marcado, copie o perfil releng officiel dans `.build/profile`, active o repositório `multilib` pour Steam **uniquement neste perfil temporário**, fusiona `components/`, e escreve o resultado em `out/os.iso`.
 
 Windows ne peut pas construire uma ISO Arch directly — utilisez WSL2 avec uma distribuição Arch, ou `build.ps1` avec Docker Desktop.
 
@@ -142,7 +145,7 @@ Pousser um tag `v*` fait la même chose. Rien n'a a ser construit sur sua própr
 | `install.sh` / `install.ps1` | Bootstrap em uma comando para Linux/macOS e Windows |
 | `you.py` | Rendeur vectoriel Faravahar (fournit en dados, parsé mas não executado) |
 | `faravahar.png` | Logo usado pelo wizard e live session |
-| `profile/packages/*.list` | Uma lista por componente (base, desktop, drivers-nvidia, …); o `build.sh` junta apenas os grupos escolhidos |
+| `components/*.list` | Uma lista por componente (base, desktop, drivers-nvidia, …); o `build.sh` junta apenas os grupos escolhidos |
 | `profile/airootfs/` | Fichiers dans l'image live (Hyprland, Waybar, autologin, setup) |
 | `build.sh` / `build.ps1` | Construction ISO reproductível dans Docker |
 | `run-windows.sh` | Boot l'ISO construite dans QEMU depuis Git Bash |
@@ -152,7 +155,7 @@ Pousser um tag `v*` fait la même chose. Rien n'a a ser construit sur sua própr
 | `NOTICE.md` | O que o projeto é e n'est pas : licensing, marcas déposées, segurança, status |
 | `.github/` | Workflow qui construit l'ISO e le publie vers releases |
 
-A session live démarre une fois, sur `tty1`, via le drop-in `getty` autologin plus `/etc/skel/.bash_profile` ; `prime-os-live-setup` crée l'utilisateur sem privilégié `prime` e installe le `/etc/prime-os/hyprland.conf` canonical.
+A session live démarre une fois, sur `tty1`, via le drop-in `getty` autologin plus `/etc/skel/.bash_profile` ; `prime-os-setup` crée l'utilisateur sem privilégié `prime` e installe le `/etc/prime-os/hyprland.conf` canonical.
 
 ## Status do projeto
 

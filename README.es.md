@@ -1,5 +1,8 @@
 # Prime-OS
 
+> **Note:** this translation predates the setup-installer layout. The commands still work; the structure sections describe an older image. [README.md](README.md) is the reference.
+
+
 [English](README.md) · [فارسی](README.fa.md) · [العربية](README.ar.md) · **Español** · [Deutsch](README.de.md)
 
 > [!CAUTION]
@@ -143,7 +146,7 @@ docker run --rm --privileged \
 
 `build.sh` se niega a ejecutarse fuera de un contenedor Arch marcado explícitamente, copia el perfil
 releng oficial a `.build/profile`, habilita el repositorio `multilib` para Steam **solo en ese perfil
-temporal**, fusiona `profile/packages/` y escribe el resultado en `out/os.iso`.
+temporal**, fusiona `components/` y escribe el resultado en `out/os.iso`.
 
 Windows no puede compilar una ISO de Arch directamente: usa WSL2 con una distribución Arch, o
 `build.ps1` con Docker Desktop.
@@ -166,7 +169,7 @@ para pruebas interactivas con el mismo comando de Docker.
 | `install.sh` / `install.ps1` | Instalación con un comando para Linux/macOS y Windows |
 | `you.py` | Renderizador vectorial del Faravahar (se envía como dato: se analiza, no se ejecuta) |
 | `faravahar.png` | Logotipo del asistente y de la sesión en vivo |
-| `profile/packages/*.list` | Una lista por componente (base, desktop, drivers-nvidia, …); `build.sh` combina solo los grupos elegidos |
+| `components/*.list` | Una lista por componente (base, desktop, drivers-nvidia, …); `build.sh` combina solo los grupos elegidos |
 | `profile/airootfs/` | Archivos dentro de la imagen en vivo (Hyprland, Waybar, autologin, setup) |
 | `build.sh` / `build.ps1` | Compilación reproducible de la ISO con Docker |
 | `run-windows.sh` | Arranca la ISO compilada en QEMU desde Git Bash |
@@ -175,7 +178,7 @@ para pruebas interactivas con el mismo comando de Docker.
 | `.github/` | Workflow de Actions que compila la ISO y la publica en las releases |
 
 La sesión en vivo se inicia una sola vez, en `tty1`, mediante el drop-in de autologin de `getty` y
-`/etc/skel/.bash_profile`; `prime-os-live-setup` crea el usuario sin privilegios `prime` e instala
+`/etc/skel/.bash_profile`; `prime-os-setup` crea el usuario sin privilegios `prime` e instala
 la configuración canónica `/etc/prime-os/hyprland.conf`.
 
 ## Estado del proyecto

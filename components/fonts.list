@@ -1,0 +1,4 @@
+# Component: fonts
+# Latin text and emoji. CJK is a separate component because it is large.
+noto-fonts
+noto-fonts-emoji

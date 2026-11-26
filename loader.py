@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Prime-OS setup wizard and live-image downloader.
+"""Prime-OS setup wizard and setup-image downloader.
 
-The wizard downloads the published Prime-OS live image (``os.iso``) from GitHub
+The wizard downloads the published Prime-OS setup image (``os.iso``) from GitHub
 releases — the only official source — and fills the Faravahar artwork in step
 with the real byte progress: one percent of the download is one percent of the
 drawing.
@@ -81,7 +81,7 @@ CHECKSUM_ASSET_NAMES = ("sha256sums.txt", "sha256sums", "checksums.txt", "sha256
 
 @dataclass(frozen=True)
 class IsoAsset:
-    """A downloadable live image plus its optional published checksum."""
+    """A downloadable setup image plus its optional published checksum."""
 
     name: str
     url: str
@@ -188,7 +188,7 @@ def gpu_name() -> str:
 
 
 def pick_iso_asset(release: dict) -> IsoAsset | None:
-    """Choose the live image from a release payload.
+    """Choose the setup image from a release payload.
 
     ``os.iso`` is preferred; any other ``*.iso`` asset is accepted as a fallback
     so older or renamed releases still work. A published checksum asset is
@@ -984,9 +984,10 @@ class PrimeSetup:
         ).pack(anchor="w", pady=(20, 10))
         if self.download_finished:
             detail = (
-                f"Your Prime-OS live image is ready at:\n{self.download_path}\n\n"
-                "Write it to a spare USB drive or boot it in a virtual machine to start the "
-                "live desktop. This wizard does not install it onto your computer."
+                f"Your Prime-OS setup image is ready at:\n{self.download_path}\n\n"
+                "Write it to a USB drive with dd, Rufus or balenaEtcher and boot it: the image is "
+                "an installer that asks what to put on the machine. This wizard does not "
+                "write the drive itself."
             )
         else:
             detail = (

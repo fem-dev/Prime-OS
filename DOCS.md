@@ -18,7 +18,10 @@ three parts: **symptom → cause → fix**.
 | `loader.py` | Tk wizard: pick a download source, download `os.iso`, save a profile | GitHub API, TLS, Pillow, Tk |
 | `you.py` | Faravahar artwork module; **parsed, never executed** | Hash pins |
 | `faravahar.png` | The logo drawn behind the progress bar | Hash pins, Pillow |
-| `build.sh` + `profile/` | Build the Arch ISO inside Docker | Pacman package availability |
+| `build.sh` + `profile/` | Build the **setup ISO**: a minimal live environment plus the installer | Pacman package availability, archiso layout |
+| `installer/prime-os-setup` + `installer/lib/*.sh` | The installer that runs on the ISO: disk, components, pacstrap, boot loader | Disk naming, mirrors, package renames |
+| `components/*.list` | What the user can choose at install time; one file per component | A package renamed upstream |
+| `installer/overlay/` | Files written onto the installed system (Hyprland, waybar, `issue`, key list) | Paths, permissions |
 | `.github/workflows/build-iso.yml` | CI build + release upload | GitHub asset size limit (2 GiB) |
 
 The installers **fail closed**. A hash mismatch is never a warning; it stops the
@@ -287,14 +290,14 @@ Arch. Multilib-only packages (`steam`) also fail unless `[multilib]` is enabled 
 the current replacement.
 
 **Where packages come from.** There is no single package list any more: every
-component is its own file under `profile/packages/` (`base.list`,
+component is its own file under `components/` (`base.list`,
 `desktop.list`, `drivers-nvidia.list`, `gaming-32bit.list`, …) and `build.sh`
 merges only the groups named in `PRIME_OS_GROUPS`. Consequences worth knowing:
 
 - `base` is always built even when you forget it — the session cannot boot
   without it.
 - An unknown name fails fast: `Unknown package group 'foo'. Available: apps base
-  desktop …`. Add `profile/packages/foo.list` to create one.
+  desktop …`. Add `components/foo.list` to create one.
 - `multilib` is enabled in the temporary profile only when `gaming-32bit` is
   selected; without that group the build would otherwise fail on `lib32-*`.
 - The selection is recorded in `out/groups.txt` and echoed into the build log, so
@@ -425,3 +428,67 @@ file first, then set `PINNED_COMMIT` / `$pinnedCommit` to that hash and commit
 the installers). Finally re-point the Windows command in every README at the
 installer commit. Skipping any of these is the most frequent cause of a
 "broken install" report.
+
+---
+
+## 18. The setup image: what changed and what breaks
+
+The image is no longer a finished desktop. It is an installer:
+
+| Part | Where it lives | What it must never do |
+| --- | --- | --- |
+| Live environment | `profile/live-packages.list` | Grow beyond an installer (CI fails above 1.2 GiB) |
+| The program | `installer/prime-os-setup` + `installer/lib/*.sh` | Run outside the ISO unless `PRIME_OS_ALLOW_NON_ISO=1` |
+| Component lists | `components/*.list` + `*.desc` | Install anything nobody ticked |
+| Target files | `installer/overlay/` | Carry a machine-specific value |
+
+Adding a component means adding `components/<name>.list` and
+`components/<name>.desc`. The checklist, the size estimate and the dependency
+warning pick it up with no code change.
+
+**`The ISO boots to a shell instead of the installer`**
+*Symptom:* you land on `root@archiso` and no dialog appears.
+*Cause:* `/root/.bash_profile` was not copied, is not executable, or `dialog` is
+missing from `profile/live-packages.list`.
+*Fix:* check `bash -n profile/airootfs/root/.bash_profile`, its mode (`0755`), and
+run `/usr/local/bin/prime-os-setup` by hand — the symlink and its target are
+created by `build.sh` under `/usr/local/lib/prime-os/`.
+
+**`No components were found in /usr/local/share/prime-os/components`**
+*Symptom:* the installer stops at the component step.
+*Cause:* `build.sh` copies `components/` into that path; a build from an older
+checkout, or a profile assembled by hand, does not have it.
+*Fix:* rebuild with `build.sh`; while developing, export
+`PRIME_OS_COMPONENTS="$PWD/components"` and run `installer/prime-os-setup`
+directly on a disposable machine.
+
+**`pacstrap: target not found: <package>` during install**
+*Symptom:* the install stops while downloading.
+*Cause:* a package in a component list was renamed or dropped upstream. The
+installer filters unknown names with `pacman -Si` before installing, so anything
+that still reaches pacstrap is a name that exists in the database but not in a
+configured repository (usually multilib).
+*Fix:* if the component is `gaming-32bit`, the multilib repository must be
+enabled; `installer/lib/apply.sh` uncomments it in the temporary
+`/tmp/prime-os-pacman.conf`. Check `/etc/pacman.conf` inside the live session.
+
+**`The installer says it cannot reach an Arch mirror`**
+*Symptom:* the retry loop ends after three attempts.
+*Cause:* no DHCP lease, an unconfigured wireless card, or a network that blocks
+`geo.mirror.pkgbuild.com`.
+*Fix:* wire the machine, or use `nmtui` from another console (`Ctrl+Alt+F2`) and
+run the installer again. A VPN is the usual answer on filtered networks; no
+mirror inside the project is used, by design.
+
+**`The installed system boots to a black screen`**
+*Symptom:* the boot loader menu appears, then nothing.
+*Cause:* no graphics stack for that GPU was installed (no `drivers-*` component),
+or the kernel has no module for the card.
+*Fix:* boot again, add `nomodeset` to the kernel command line to reach a console,
+then install the matching `drivers-*` component. This is the reason the
+checklist warns when `gaming-32bit` is chosen without a driver.
+
+**`The wizard has no mirror to fall back on`**
+Not a bug. The project publishes through GitHub releases only, and the ISO is
+small enough to be a single asset again. The parts manifest stays supported so an
+older release can still be downloaded with a current `loader.py`.

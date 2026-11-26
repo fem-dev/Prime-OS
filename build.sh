@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
+# Build the Prime-OS setup image.
+#
+# The result is a small bootable installer, not a desktop: it holds dial(1) and
+# pacstrap, and it asks the user which components to install. Everything the
+# user chooses comes from the Arch mirrors at install time, which is why this
+# image stays a few hundred megabytes instead of a couple of gigabytes.
+#
+# Run it inside the Arch container described in DOCS.md:
+#   docker run --rm -it --privileged -e PRIME_OS_BUILD_CONTAINER=1 \
+#     -v "$PWD:/work" -w /work archlinux:latest
+#   # then, in the container:
+#   pacman -Syu --noconfirm archiso && bash build.sh
 set -Eeuo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROFILE_SOURCE="${ROOT}/profile"
+INSTALLER_SOURCE="${ROOT}/installer"
+COMPONENT_SOURCE="${ROOT}/components"
 BUILD_DIR="${ROOT}/.build"
 PROFILE_WORK="${BUILD_DIR}/profile"
 WORK_DIR="${BUILD_DIR}/work"
@@ -12,101 +26,104 @@ fail() {
     printf 'Prime-OS build: %s\n' "$*" >&2
     exit 1
 }
+log() {
+    printf 'Prime-OS build: %s\n' "$*"
+}
 
-# This script is intended to run as root only inside the disposable Arch container.
-[[ "$(uname -s)" == Linux ]] || fail "Run this build in the Arch Linux Docker container from README.md."
-[[ -r /etc/os-release ]] || fail "Cannot identify the Linux distribution."
+[[ "$(uname -s)" == Linux ]] || fail "Run this build on Linux, in the Arch container from DOCS.md."
 # shellcheck source=/etc/os-release
 . /etc/os-release
-[[ "${ID:-}" == arch ]] || fail "The ISO builder requires Arch Linux inside the build container."
-[[ "${EUID}" -eq 0 ]] || fail "The Arch build container must run as root. See README.md."
-[[ "${PRIME_OS_BUILD_CONTAINER:-}" == 1 ]] || fail "Refusing to build outside the explicitly marked container."
-command -v mkarchiso >/dev/null 2>&1 || fail "Install archiso in the container before building."
+[[ "${ID:-}" == arch ]] || fail "The image builder needs Arch Linux (archiso) inside the build container."
+[[ "${EUID}" -eq 0 ]] || fail "The Arch build container must run as root."
+[[ "${PRIME_OS_BUILD_CONTAINER:-}" == 1 ]] || fail "Refusing to build outside the marked build container."
+command -v mkarchiso >/dev/null 2>&1 || fail "archiso is not installed: pacman -S archiso"
 [[ -d /usr/share/archiso/configs/releng ]] || fail "Arch's releng profile is missing; reinstall archiso."
 
-# Do not let generated paths redirect cleanup or ISO output outside this checkout.
 for path in "${BUILD_DIR}" "${PROFILE_WORK}" "${WORK_DIR}" "${OUT_DIR}"; do
-    [[ ! -L "${path}" ]] || fail "Refusing to use a symlink as a build/output directory: ${path}"
+    [[ ! -L "${path}" ]] || fail "Refusing to use a symlink as a build or output directory: ${path}"
 done
-[[ -d "${PROFILE_SOURCE}/airootfs" ]] || fail "Prime-OS profile files are missing."
-[[ -d "${PROFILE_SOURCE}/packages" ]] || fail "Prime-OS package groups are missing."
-
-# === package groups =========================================================
-# Every part of the system is its own list under profile/packages, so an image
-# can be built without dragging everything in. Pick the groups with
-# PRIME_OS_GROUPS="base desktop apps" (or "all"), separated by spaces.
-PACKAGE_DIR="${PROFILE_SOURCE}/packages"
-DEFAULT_GROUPS="base desktop apps fonts drivers-amd drivers-intel"
-ALL_GROUPS="base desktop apps fonts fonts-cjk drivers-amd drivers-intel drivers-nvidia gaming-32bit"
-PACKAGE_GROUPS="${PRIME_OS_GROUPS:-${DEFAULT_GROUPS}}"
-[[ "${PACKAGE_GROUPS}" == "all" ]] && PACKAGE_GROUPS="${ALL_GROUPS}"
-
-AVAILABLE_GROUPS="$(cd -- "${PACKAGE_DIR}" && ls -- *.list 2>/dev/null | sed 's/\.list$//' | tr '\n' ' ')"
-for group in ${PACKAGE_GROUPS}; do
-    [[ -f "${PACKAGE_DIR}/${group}.list" ]] \
-        || fail "Unknown package group '${group}'. Available: ${AVAILABLE_GROUPS}"
+for required in "${PROFILE_SOURCE}/airootfs" "${INSTALLER_SOURCE}/prime-os-setup" \
+                "${INSTALLER_SOURCE}/lib" "${INSTALLER_SOURCE}/overlay" "${COMPONENT_SOURCE}"; do
+    [[ -e "${required}" ]] || fail "Missing source: ${required}"
 done
-# base is never optional: the live session cannot boot without it.
-case " ${PACKAGE_GROUPS} " in
-    *" base "*) ;;
-    *) PACKAGE_GROUPS="base ${PACKAGE_GROUPS}" ;;
-esac
-printf 'Package groups: %s\n' "${PACKAGE_GROUPS}"
+[[ -f "${PROFILE_SOURCE}/live-packages.list" ]] || fail "profile/live-packages.list is missing."
 
+# === package list ===========================================================
+# Only what the installer itself needs. The list is filtered against the sync
+# databases so a firmware package that Arch renamed cannot break the build.
+log "refreshing the package databases"
+pacman -Sy --noconfirm >/dev/null 2>&1 || fail "Could not refresh the package databases."
+
+PACKAGES=()
+MISSING=()
+while IFS= read -r line; do
+    pkg="${line%%#*}"
+    pkg="$(printf '%s' "${pkg}" | tr -d '[:space:]')"
+    [[ -n "${pkg}" ]] || continue
+    if pacman -Si "${pkg}" >/dev/null 2>&1; then
+        PACKAGES+=("${pkg}")
+    else
+        MISSING+=("${pkg}")
+    fi
+done < "${PROFILE_SOURCE}/live-packages.list"
+
+[[ "${#PACKAGES[@]}" -gt 0 ]] || fail "No package from profile/live-packages.list exists in the mirrors."
+if [[ "${#MISSING[@]}" -gt 0 ]]; then
+    log "skipping packages the mirrors do not have: ${MISSING[*]}"
+fi
+
+# === work profile ===========================================================
+log "preparing the build profile"
 mkdir -p -- "${BUILD_DIR}" "${OUT_DIR}"
 rm -rf -- "${PROFILE_WORK}"
 mkdir -p -- "${PROFILE_WORK}" "${WORK_DIR}"
 cp -a /usr/share/archiso/configs/releng/. "${PROFILE_WORK}/"
+# Our files win over releng's: same paths, copied after.
 cp -a "${PROFILE_SOURCE}/airootfs/." "${PROFILE_WORK}/airootfs/"
 
+AIROOT="${PROFILE_WORK}/airootfs"
+install -d "${AIROOT}/usr/local/bin" "${AIROOT}/usr/local/lib/prime-os" \
+           "${AIROOT}/usr/local/share/prime-os"
+
+# The installer is copied as separate files: the program, its modules, the
+# component descriptions and the overlay that is laid down on the target disk.
+cp -a "${INSTALLER_SOURCE}/prime-os-setup" "${AIROOT}/usr/local/lib/prime-os/prime-os-setup"
+cp -a "${INSTALLER_SOURCE}/lib/." "${AIROOT}/usr/local/lib/prime-os/lib/"
+cp -a "${COMPONENT_SOURCE}/." "${AIROOT}/usr/local/share/prime-os/components/"
+cp -a "${INSTALLER_SOURCE}/overlay/." "${AIROOT}/usr/local/share/prime-os/overlay/"
+ln -sf ../lib/prime-os/prime-os-setup "${AIROOT}/usr/local/bin/prime-os-setup"
+
+chmod 0755 "${AIROOT}/usr/local/lib/prime-os/prime-os-setup" \
+           "${AIROOT}/usr/local/lib/prime-os/lib/"*.sh \
+           "${AIROOT}/root/.bash_profile"
+
 {
-    # The releng list pulls the linux-firmware meta package, which drags in the
-    # firmware of every vendor (~276 MiB). Each group names the firmware it
-    # actually needs, so drop the meta and keep the modular pieces.
-    grep -v -x 'linux-firmware' /usr/share/archiso/configs/releng/packages.x86_64
-    for group in ${PACKAGE_GROUPS}; do
-        printf '# --- group: %s ---\n' "${group}"
-        sed -e 's/#.*//' -e 's/[[:space:]]*$//' "${PACKAGE_DIR}/${group}.list"
-    done
-} | awk 'NF && !seen[$0]++' > "${PROFILE_WORK}/packages.x86_64"
-printf '%s\n' "${PACKAGE_GROUPS}" > "${OUT_DIR}/groups.txt"
-chmod 0755 \
-    "${PROFILE_WORK}/airootfs/root/.automated_script.sh" \
-    "${PROFILE_WORK}/airootfs/usr/local/bin/prime-os-live-setup"
+    printf '# Generated by Prime-OS build.sh — %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf '%s\n' "${PACKAGES[@]}"
+} > "${PROFILE_WORK}/packages.x86_64"
 
-# 32-bit packages come from multilib; enable it only when that group is built,
-# and only in this temporary build profile.
-if [[ " ${PACKAGE_GROUPS} " == *" gaming-32bit "* ]]; then
-    PACMAN_CONF="${PROFILE_WORK}/pacman.conf"
-    if grep -q '^#\[multilib\]' "${PACMAN_CONF}"; then
-        sed -i \
-            '/^#\[multilib\]/,/^#Include = \/etc\/pacman.d\/mirrorlist/ s/^#//' \
-            "${PACMAN_CONF}"
-    elif ! grep -q '^\[multilib\]' "${PACMAN_CONF}"; then
-        fail "Could not find the multilib section in Arch's pacman.conf."
-    fi
-    printf 'multilib enabled for the 32-bit gaming group.\n'
-fi
-
+# === image identity =========================================================
 PROFILE_DEF="${PROFILE_WORK}/profiledef.sh"
 sed -i \
     -e 's|^iso_name=.*|iso_name="prime-os"|' \
-    -e 's|^iso_label=.*|iso_label="PRIME_OS_$(date +%Y%m)"|' \
+    -e "s|^iso_label=.*|iso_label=\"PRIME_SETUP_$(date +%y%m)\"|" \
     -e 's|^iso_publisher=.*|iso_publisher="Prime-OS <https://github.com/fem-dev/Prime-OS>"|' \
-    -e 's|^iso_application=.*|iso_application="Prime-OS Live"|' \
+    -e 's|^iso_application=.*|iso_application="Prime-OS Setup"|' \
     "${PROFILE_DEF}"
 
-printf 'Building Prime-OS ISO (this downloads Arch packages)…\n'
+log "packages in the image: ${#PACKAGES[@]}"
+log "building (this downloads the live environment and compresses it)"
+
 mkarchiso -v -w "${WORK_DIR}" -o "${OUT_DIR}" "${PROFILE_WORK}"
 
 ISO="$(find "${OUT_DIR}" -maxdepth 1 -type f -name 'prime-os-*-x86_64.iso' \
     -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
-[[ -n "${ISO}" && -f "${ISO}" ]] || fail "Build completed without producing a Prime-OS ISO."
-
+[[ -n "${ISO}" && -f "${ISO}" ]] || fail "The build finished without producing an ISO."
 if [[ "${ISO}" != "${OUT_DIR}/os.iso" ]]; then
     mv -f -- "${ISO}" "${OUT_DIR}/os.iso"
 fi
 
-printf '\nBuild complete: %s\n' "${OUT_DIR}/os.iso"
-printf 'Groups in this image: %s\n' "${PACKAGE_GROUPS}"
-printf 'Test the ISO in a virtual machine before using it on physical hardware.\n'
+SIZE="$(stat -c%s "${OUT_DIR}/os.iso")"
+log "written: ${OUT_DIR}/os.iso ($(numfmt --to=iec "${SIZE}"))"
+log "components offered by this build: $(cd "${COMPONENT_SOURCE}" && ls -- *.list | sed 's/\.list$//' | tr '\n' ' ')"
+log "the image is an installer: boot it in a VM and complete the wizard before flashing hardware."

@@ -1,0 +1,7 @@
+
+  P R I M E - O S
+  Cockpit of the installed system
+
+  Super+/     the key list (this file lives on the disk)
+  /etc/prime-os/install.conf   what was chosen during installation
+

@@ -1,0 +1,4 @@
+# Component: apps
+# Graphical programs a first boot usually wants. Needs the desktop component.
+firefox
+geany

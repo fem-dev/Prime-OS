@@ -1,0 +1,10 @@
+# Component: gaming-32bit
+# 32-bit userspace for Wine and Steam. Enables the multilib repository.
+lib32-mesa
+lib32-vulkan-radeon
+lib32-vulkan-intel
+lib32-nvidia-utils
+lib32-alsa-lib
+lib32-libpulse
+# Steam is not listed: it is a large download the user should choose in Steam's
+# own installer after the system is up.

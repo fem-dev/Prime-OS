@@ -1,5 +1,8 @@
 # Prime-OS
 
+> **Note:** this translation predates the setup-installer layout. The commands still work; the structure sections describe an older image. [README.md](README.md) is the reference.
+
+
 [English](README.md) · [中文]· [العربية](README.ar.md) · [Español](README.es.md) · [Deutsch](README.de.md) · [Farsi](README.fa.md) · [Français](README.fr.md) · [Italiano](README.it.md) · [Português](README.po.md) · [Русский](README.ru.md)
 
 > [!CAUTION]
@@ -120,7 +123,7 @@ docker run --rm --privileged \\
   bash -lc 'pacman -Syu --noconfirm archiso && bash ./build.sh'
 ```
 
-`build.sh` 拒绝在明确标记的 Arch 容器外运行，将官方 releng 配置复制到 `.build/profile`，仅在该临时配置中启用 `multilib` repo 用于 Steam，合并 `profile/packages/`，并将结果写入 `out/os.iso`。
+`build.sh` 拒绝在明确标记的 Arch 容器外运行，将官方 releng 配置复制到 `.build/profile`，仅在该临时配置中启用 `multilib` repo 用于 Steam，合并 `components/`，并将结果写入 `out/os.iso`。
 
 Windows 无法直接构建 Arch ISO — 使用 WSL2 配合 Arch distribution，或使用 `build.ps1` 配合 Docker Desktop.
 
@@ -140,7 +143,7 @@ Windows 无法直接构建 Arch ISO — 使用 WSL2 配合 Arch distribution，�
 | `install.sh` / `install.ps1` | Linux/macOS 和 Windows 的一键启动 |
 | `you.py` | Faravahar vector renderer (以数据形式提供, 被解析但不执行) |
 | `faravahar.png` | wizard 和 live 会话使用的标志 |
-| `profile/packages/*.list` | 每个组件一个列表（base、desktop、drivers-nvidia……），`build.sh` 只合并所选分组 |
+| `components/*.list` | 每个组件一个列表（base、desktop、drivers-nvidia……），`build.sh` 只合并所选分组 |
 | `profile/airootfs/` | live 镜像中的文件 (Hyprland, Waybar, autologin, setup) |
 | `build.sh` / `build.ps1` | Docker 中的可重复 ISO 构建 |
 | `run-windows.sh` | 从 Git Bash 中用 QEMU 启动 ISO |
@@ -150,7 +153,7 @@ Windows 无法直接构建 Arch ISO — 使用 WSL2 配合 Arch distribution，�
 | `NOTICE.md` | 项目包含和不包含的内容: 许可证, 商标, 安全, 状态 |
 | `.github/` | 构建 ISO 并发布到 Release 的 Workflow |
 
-Live 会话通过 `tty1` 的 `getty` autologin drop-in 加上 `/etc/skel/.bash_profile` 开始；`prime-os-live-setup` 创建无特权的 `prime` 用户并安装 canonical `/etc/prime-os/hyprland.conf`.
+Live 会话通过 `tty1` 的 `getty` autologin drop-in 加上 `/etc/skel/.bash_profile` 开始；`prime-os-setup` 创建无特权的 `prime` 用户并安装 canonical `/etc/prime-os/hyprland.conf`.
 
 ## 项目状态
 

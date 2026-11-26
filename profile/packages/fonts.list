@@ -1,5 +1,0 @@
-# Group: fonts
-# Latin + emoji. CJK lives in the optional fonts-cjk group (~190 MiB) because
-# it is the single largest non-driver item in the image.
-noto-fonts
-noto-fonts-emoji

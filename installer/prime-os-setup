@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Prime-OS Setup
+#
+# The program that runs on tty1 of the Prime-OS setup ISO. It asks what to
+# install, writes only the components that were chosen onto the target disk and
+# leaves everything else on the network mirrors.
+#
+# Each step lives in its own file under lib/, and the files it lays down on the
+# installed system live under overlay/ — nothing here is a single monolithic
+# script on purpose.
+#
+# This program is destructive: it partitions a disk. It refuses to run unless it
+# finds the ISO marker written by build.sh.
+set -Eeuo pipefail
+
+SELF_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="${SELF_DIR}/lib"
+
+# build.sh copies components/ and overlay/ next to the program; the defaults also
+# work when the installer is run straight from a checkout during development.
+COMPONENT_DIR="${PRIME_OS_COMPONENTS:-/usr/local/share/prime-os/components}"
+OVERLAY_DIR="${PRIME_OS_OVERLAY:-/usr/local/share/prime-os/overlay}"
+[[ -d "${COMPONENT_DIR}" ]] || COMPONENT_DIR="${SELF_DIR}/../components"
+[[ -d "${OVERLAY_DIR}" ]] || OVERLAY_DIR="${SELF_DIR}/../overlay"
+export COMPONENT_DIR OVERLAY_DIR
+
+if [[ "${EUID}" -ne 0 ]]; then
+    printf 'Prime-OS Setup must run as root.\n' >&2
+    exit 1
+fi
+if [[ ! -r /run/archiso/bootmnt ]] && [[ "${PRIME_OS_ALLOW_NON_ISO:-0}" != 1 ]]; then
+    printf 'This installer only runs from the Prime-OS setup ISO.\n' >&2
+    printf 'Set PRIME_OS_ALLOW_NON_ISO=1 only inside a disposable test container.\n' >&2
+    exit 1
+fi
+for module in common network disk components account apply boot; do
+    if [[ ! -r "${LIB_DIR}/${module}.sh" ]]; then
+        printf 'Installer module missing: %s\n' "${LIB_DIR}/${module}.sh" >&2
+        exit 1
+    fi
+    # shellcheck source=/dev/null
+    . "${LIB_DIR}/${module}.sh"
+done
+
+main() {
+    init_screen
+    step_preflight
+    step_network
+    step_disk
+    step_components
+    step_account
+    step_apply
+    step_bootloader
+    step_finish
+}
+
+main "$@"

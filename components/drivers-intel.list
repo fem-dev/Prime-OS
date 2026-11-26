@@ -1,0 +1,5 @@
+# Component: drivers-intel
+# Intel integrated graphics: Mesa, Vulkan and the media driver.
+mesa
+vulkan-intel
+intel-media-driver

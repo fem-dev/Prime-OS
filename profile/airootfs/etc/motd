@@ -1,9 +1,9 @@
-Prime-OS Live — preview release
-================================
 
-  Desktop   Hyprland on Wayland          Super+Enter  terminal
-  Files     pcmanfm                      Super+D      launcher
-  Browser   firefox                      Super+1..9   workspace
+  P R I M E - O S   S E T U P
 
-  This lives in RAM only: a reboot returns to your installed system.
-  Report problems with your GPU model and driver version.
+  This image is an installer, not a desktop. It holds no applications:
+  it asks what to install and fetches only that from the Arch mirrors.
+
+  The setup program starts automatically on this console. If it exits,
+  type  prime-os-setup  to start it again.
+

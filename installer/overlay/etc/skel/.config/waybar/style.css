@@ -1,0 +1,66 @@
+/* Prime-OS panel — basalt and lapis with a gold rule underneath. */
+
+* {
+  font-family: "Noto Sans", sans-serif;
+  font-size: 13px;
+  min-height: 0;
+}
+
+window#waybar {
+  background: #0B1020;
+  color: #EFE6D2;
+  border-bottom: 2px solid #D4A537;
+}
+
+#custom-brand {
+  padding: 0 14px;
+  color: #F0C75E;
+  font-weight: 700;
+  letter-spacing: 3px;
+}
+
+#workspaces button {
+  padding: 0 8px;
+  color: #6E7A96;
+  background: transparent;
+  border: none;
+}
+
+#workspaces button.active {
+  color: #0B1020;
+  background: #D4A537;
+  border-radius: 3px;
+}
+
+#workspaces button.urgent {
+  color: #EFE6D2;
+  background: #A6472F;
+  border-radius: 3px;
+}
+
+#clock {
+  color: #EFE6D2;
+  font-weight: 600;
+}
+
+#cpu,
+#memory,
+#pulseaudio,
+#network,
+#battery,
+#tray {
+  padding: 0 10px;
+  color: #C9D1E4;
+}
+
+#battery.warning {
+  color: #D4A537;
+}
+
+#battery.critical {
+  color: #A6472F;
+}
+
+#network.disconnected {
+  color: #A6472F;
+}

@@ -1,5 +1,8 @@
 # Prime-OS
 
+> **Note:** this translation predates the setup-installer layout. The commands still work; the structure sections describe an older image. [README.md](README.md) is the reference.
+
+
 [English](README.md) · [فارسی](README.fa.md) · [العربية](README.ar.md) · [Español](README.es.md) · **Deutsch**
 
 > [!CAUTION]
@@ -146,7 +149,7 @@ docker run --rm --privileged \
 
 `build.sh` weigert sich außerhalb eines ausdrücklich markierten Arch-Containers zu laufen, kopiert das
 offizielle releng-Profil nach `.build/profile`, aktiviert das `multilib`-Repository für Steam **nur in
-diesem temporären Profil**, führt `profile/packages/` zusammen und schreibt das Ergebnis nach
+diesem temporären Profil**, führt `components/` zusammen und schreibt das Ergebnis nach
 `out/os.iso`.
 
 Windows kann eine Arch-ISO nicht direkt bauen – nutze WSL2 mit einer Arch-Distribution oder
@@ -170,7 +173,7 @@ Codespace eignet sich für interaktive Tests mit demselben Docker-Befehl.
 | `install.sh` / `install.ps1` | Ein-Befehl-Installation für Linux/macOS und Windows |
 | `you.py` | Vektor-Renderer für den Faravahar (als Datum ausgeliefert: geparst, nicht ausgeführt) |
 | `faravahar.png` | Logo des Assistenten und der Live-Sitzung |
-| `profile/packages/*.list` | Eine Liste pro Komponente (base, desktop, drivers-nvidia, …); `build.sh` führt nur die gewählten Gruppen zusammen |
+| `components/*.list` | Eine Liste pro Komponente (base, desktop, drivers-nvidia, …); `build.sh` führt nur die gewählten Gruppen zusammen |
 | `profile/airootfs/` | Dateien im Live-Image (Hyprland, Waybar, Autologin, Setup) |
 | `build.sh` / `build.ps1` | Reproduzierbarer ISO-Build in Docker |
 | `run-windows.sh` | Startet die gebaute ISO in QEMU aus der Git Bash |
@@ -179,7 +182,7 @@ Codespace eignet sich für interaktive Tests mit demselben Docker-Befehl.
 | `.github/` | Actions-Workflow, der die ISO baut und als Release veröffentlicht |
 
 Die Live-Sitzung startet genau einmal auf `tty1` über das `getty`-Autologin-Drop-in zusammen mit
-`/etc/skel/.bash_profile`; `prime-os-live-setup` legt den unprivilegierten Benutzer `prime` an und
+`/etc/skel/.bash_profile`; `prime-os-setup` legt den unprivilegierten Benutzer `prime` an und
 installiert die maßgebliche Konfiguration `/etc/prime-os/hyprland.conf`.
 
 ## Projektstatus

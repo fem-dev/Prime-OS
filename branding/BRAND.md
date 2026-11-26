@@ -8,12 +8,18 @@ This is a *design* language. Every user-facing string stays in **English**;
 ancient motifs are drawn, not written. No Persian script, no Arabic script, no
 religious iconography, no flags of present-day states, no portraits of rulers.
 
-## 1. The marks
+**No image assets.** The repository ships no wallpaper, no banner and no logo
+file of its own: the desktop paints solid basalt with `swaybg -c`, the panel and
+borders take their colours from the palette, and the wizard draws the Faravahar
+from `faravahar.png` at run time. A generated picture is a guess about what looks
+right, and a guess that someone has to maintain; colour and geometry are neither.
+If a picture is ever wanted, it must be looked at by a human before it is
+committed.
 
 | Motif | Where it is used | How to draw it |
 | --- | --- | --- |
 | **Winged Faravahar** | Project mark, wizard artwork, ISO splash | Already in `faravahar.png`; keep the outline visible at 0 % and fill with gold as work progresses |
-| **Apādana columns** | README hero, wallpapers, section dividers | Fluted shafts with a double-bull capital, drawn flat: two mirrored volutes over a square abacus |
+| **Apādana columns** | Section dividers, console rules | Fluted shafts with a double-bull capital, drawn flat: two mirrored volutes over a square abacus |
 | **Tribute frieze** | Thin rules under headers, Waybar baseline | A row of equal-height rectangles with a 1 px gold top edge, 2 px gaps |
 | **Lotus rosette** | Bullets, loading states | Twelve petals around a centre dot, single colour |
 | **Persepolis stair profile** | Corner ornaments | Three stepped lines rising to the right, never more than three |
@@ -66,21 +72,22 @@ software is ancient, royal, imperial, or divinely favoured.
 ## 5. Naming
 
 - Product: `Prime-OS` (always with the hyphen).
-- Live image: `Prime-OS Live`.
+- Setup image: `Prime-OS Setup`.
+- Installed system: `Prime-OS`.
 - Release tags: `os-preview`, then `apadana`, `tachar`, `hadish` for later
   milestones — lower case, one word.
-- ISO label: `PRIME_OS`, application string `Prime-OS Live`.
+- ISO label: `PRIME_SETUP`, application string `Prime-OS Setup`.
 
 ## 6. Where the identity is applied
 
 | File | What it carries |
 | --- | --- |
 | `branding/palette.json` | The tokens above, machine readable |
-| `branding/hero.svg` | README banner: colonnade and winged disc |
-| `profile/airootfs/usr/share/backgrounds/prime-os.png` | Live-session wallpaper |
-| `profile/airootfs/etc/skel/.config/waybar/style.css` | Bar colours |
-| `profile/airootfs/etc/prime-os/hyprland.conf` | Border and shadow colours |
-| `profile/airootfs/etc/issue`, `etc/motd` | Text console banner |
+| `installer/lib/common.sh` | Console frames and the installer's wording |
+| `installer/overlay/etc/skel/.config/waybar/style.css` | Bar colours |
+| `installer/overlay/etc/skel/.config/hypr/hyprland.conf` | Border, shadow and the solid background colour |
+| `installer/overlay/etc/issue`, `etc/motd` | Banner of the installed system |
+| `profile/airootfs/etc/issue`, `etc/motd` | Banner of the setup image |
 | `loader.py` | Wizard window: basalt background, gold focus, Faravahar progress |
 
 ## 7. Things this identity is not

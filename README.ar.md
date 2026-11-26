@@ -1,5 +1,8 @@
 # برايم-أو إس (Prime-OS)
 
+> **Note:** this translation predates the setup-installer layout. The commands still work; the structure sections describe an older image. [README.md](README.md) is the reference.
+
+
 [English](README.md) · [فارسی](README.fa.md) · **العربية** · [Español](README.es.md) · [Deutsch](README.de.md)
 
 > [!CAUTION]
@@ -134,7 +137,7 @@ docker run --rm --privileged \
 
 يرفض `build.sh` العمل خارج حاوية Arch مُعلَّمة صراحةً، وينسخ ملف تعريف releng الرسمي إلى
 `.build/profile`، ويُفعّل مستودع `multilib` لـ Steam في ذلك الملف المؤقت فقط، ويدمج
-`profile/packages/`، ويكتب الناتج في `out/os.iso`.
+`components/`، ويكتب الناتج في `out/os.iso`.
 
 لا يستطيع Windows بناء ISO لـ Arch مباشرة — استخدم WSL2 مع توزيعة Arch أو `build.ps1` مع Docker Desktop.
 
@@ -156,7 +159,7 @@ docker run --rm --privileged \
 | `install.sh` / `install.ps1` | تثبيت بأمر واحد لـ Linux/macOS وWindows |
 | `you.py` | مُصيّر الفَرَوَهَري المتّجهي (يُشحن كبيانات، يُحلَّل ولا يُنفَّذ) |
 | `faravahar.png` | الشعار المستخدم في المعالج وفي الجلسة الحيّة |
-| `profile/packages/*.list` | قائمة لكل مكوّن (base، desktop، drivers-nvidia، …) و`build.sh` يدمج المجموعات المختارة فقط |
+| `components/*.list` | قائمة لكل مكوّن (base، desktop، drivers-nvidia، …) و`build.sh` يدمج المجموعات المختارة فقط |
 | `profile/airootfs/` | ملفات داخل الصورة الحيّة (Hyprland، Waybar، الدخول التلقائي، سكربت الإعداد) |
 | `build.sh` / `build.ps1` | بناء ISO قابل للتكرار داخل Docker |
 | `run-windows.sh` | إقلاع ISO المبني في QEMU من Git Bash |
@@ -165,7 +168,7 @@ docker run --rm --privileged \
 | `.github/` | سير عمل Actions لبناء ISO ونشره في الإصدارات |
 
 تبدأ الجلسة الحيّة مرة واحدة وعلى `tty1` عبر ملف الدخول التلقائي لـ `getty` مع
-`/etc/skel/.bash_profile`؛ وينشئ `prime-os-live-setup` المستخدم غير المميّز `prime` ويثبّت ملف
+`/etc/skel/.bash_profile`؛ وينشئ `prime-os-setup` المستخدم غير المميّز `prime` ويثبّت ملف
 الإعداد المرجعي `/etc/prime-os/hyprland.conf`.
 
 ## حالة المشروع

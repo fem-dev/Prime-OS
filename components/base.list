@@ -1,0 +1,10 @@
+# Component: base
+# Not optional. A system cannot boot without a kernel, an initramfs, a package
+# manager, a network stack and the tools the installer needs afterwards.
+base
+linux
+sudo
+networkmanager
+nano
+less
+dosfstools

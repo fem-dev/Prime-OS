@@ -1,0 +1,65 @@
+// Prime-OS panel. Colours live in style.css; every module here is optional and
+// can be removed without touching the rest of the bar.
+{
+  "layer": "top",
+  "position": "top",
+  "height": 30,
+  "spacing": 6,
+  "modules-left": ["custom/brand", "hyprland/workspaces"],
+  "modules-center": ["clock"],
+  "modules-right": ["cpu", "memory", "pulseaudio", "network", "battery", "tray"],
+
+  "custom/brand": {
+    "format": "PRIME-OS",
+    "tooltip": false
+  },
+
+  "hyprland/workspaces": {
+    "format": "{icon}",
+    "on-click": "activate",
+    "format-icons": {
+      "default": "·",
+      "active": "◆",
+      "urgent": "!"
+    }
+  },
+
+  "clock": {
+    "format": "{:%H:%M}",
+    "tooltip-format": "{:%A %d %B %Y}"
+  },
+
+  "cpu": {
+    "format": "CPU {usage}%",
+    "interval": 3
+  },
+
+  "memory": {
+    "format": "RAM {percentage}%",
+    "interval": 5
+  },
+
+  "pulseaudio": {
+    "format": "VOL {volume}%",
+    "format-muted": "VOL muted",
+    "on-click": "pavucontrol"
+  },
+
+  "network": {
+    "format-wifi": "WIFI {essid}",
+    "format-ethernet": "LAN",
+    "format-disconnected": "OFFLINE",
+    "on-click": "kitty -e nmtui"
+  },
+
+  "battery": {
+    "format": "BAT {capacity}%",
+    "format-charging": "CHG {capacity}%",
+    "states": { "warning": 20, "critical": 10 }
+  },
+
+  "tray": {
+    "icon-size": 16,
+    "spacing": 8
+  }
+}

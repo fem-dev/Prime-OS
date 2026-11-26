@@ -1,0 +1,26 @@
+# Component: desktop
+# The Wayland session: compositor, panel, launcher, portals, audio, files.
+hyprland
+waybar
+wofi
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+polkit
+pipewire
+pipewire-alsa
+pipewire-pulse
+wireplumber
+alsa-utils
+pcmanfm
+kitty
+dunst
+swaybg
+libnotify
+dbus
+grim
+slurp
+pavucontrol
+wl-clipboard
+brightnessctl
+playerctl
+polkit-gnome

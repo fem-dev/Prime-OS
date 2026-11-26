@@ -1,0 +1,4 @@
+# Component: drivers-nvidia
+# Proprietary NVIDIA stack. Large: nvidia-utils alone is about 1 GiB installed.
+nvidia-open
+nvidia-settings

@@ -15,16 +15,14 @@ on:
         description: Mark the release as a pre-release
         type: boolean
         default: true
-      groups:
-        description: "Package groups to include, space-separated (empty = default slim set, 'all' = everything)"
-        required: false
-        default: ""
   push:
     tags:
       - "v*"
     branches:
       - main
     paths:
+      - "installer/**"
+      - "components/**"
       - "profile/**"
       - "build.sh"
       - "build.ps1"
@@ -49,10 +47,8 @@ jobs:
       # push to main refreshes the rolling os-preview release.
       TAG: ${{ inputs.tag || (github.ref_type == 'tags' && github.ref_name || 'os-preview') }}
       PRERELEASE_INPUT: ${{ inputs.prerelease }}
-      # Each component of the image is its own list under profile/packages;
-      # build.sh merges only the groups named here (empty string = default set,
-      # which leaves out NVIDIA, the 32-bit libraries and CJK fonts).
-      PRIME_OS_GROUPS: ${{ inputs.groups }}
+      # The image is an installer, so there is nothing to choose at build time:
+      # components/ lists are shipped inside it and the user picks them there.
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -67,7 +63,7 @@ jobs:
           sudo rm -f /swapfile 2>/dev/null || true
           df -h /
 
-      - name: Build the live image
+      - name: Build the setup image
         # One progress bar with a heartbeat; the full log is kept in build.log.
         # mkarchiso compresses the airootfs with xz, which is the long step.
         run: |
@@ -80,19 +76,22 @@ jobs:
 
       - name: Check the image
         run: |
-          echo "package groups: $(cat out/groups.txt 2>/dev/null || echo 'unknown')"
-          echo "### Package groups: \`$(cat out/groups.txt 2>/dev/null || echo unknown)\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "components shipped: $(ls components/*.list | xargs -n1 basename | sed 's/\.list//' | tr '\n' ' ')"
+          echo "### Components: \`$(ls components/*.list | xargs -n1 basename | sed 's/\.list//' | tr '\n' ' ')\`" >> "$GITHUB_STEP_SUMMARY"
           ls -lh out/os.iso
           file out/os.iso
           size=$(stat -c%s out/os.iso)
           echo "os.iso is $((size / 1024 / 1024)) MiB"
-          # Verify ISO is not empty and has reasonable size (>= 100MiB, <= 2.5GiB)
-          if [ "$size" -lt 104857600 ]; then
-            echo "::error::ISO too small (< 100MiB), likely build failed"
+          # The setup image holds an installer, not a desktop: if it is smaller
+          # than 50 MiB the squashfs is broken, and if it passes 1.2 GiB something
+          # that belongs to an installed system was pulled into the live profile.
+          if [ "$size" -lt 52428800 ]; then
+            echo "::error::ISO too small (< 50MiB), the live environment is broken"
             exit 1
           fi
-          if [ "$size" -gt 2621440000 ]; then
-            echo "::warning::ISO larger than 2.5GiB, release upload may fail due to GitHub 2GiB asset limit"
+          if [ "$size" -gt 1288490188 ]; then
+            echo "::error::ISO larger than 1.2GiB: the setup image must stay an installer"
+            exit 1
           fi
 
       - name: Take ownership of the build output

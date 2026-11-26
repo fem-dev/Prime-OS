@@ -1,0 +1,40 @@
+PRIME-OS — KEYBOARD
+===================
+Super is the Windows key. This page is on the disk, so it works when the
+network does not.
+
+SESSION
+  Super + Return      terminal (kitty)
+  Super + D           application launcher (wofi)
+  Super + B           firefox
+  Super + E           file manager
+  Super + N           network menu (nmtui)
+  Super + P           volume and devices (pavucontrol)
+  Super + /           this page
+  Super + Q           close the window
+  Super + M           end the session
+  Super + F           full screen
+  Super + V           floating window
+  Super + J           split direction
+
+WINDOWS
+  Super + arrows      move focus
+  Super + Shift + arr move the window
+
+WORKSPACES
+  Super + 1..5        go to workspace
+  Super + Shift + 1..5 move the window there
+  Super + wheel       previous / next workspace
+
+SCREENSHOTS
+  Print               select an area, copy it
+  Super + Print       whole screen, copy it
+
+SOUND AND LIGHT
+  volume / play keys  work on the media keys
+  brightness keys     work on laptops
+
+FILES
+  ~/.config/hypr/hyprland.conf     the session
+  ~/.config/waybar/                the panel
+  /etc/prime-os/install.conf       what this machine was installed with
