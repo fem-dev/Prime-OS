@@ -11,10 +11,10 @@ set -Eeuo pipefail
 REPO_RAW="https://raw.githubusercontent.com/fem-dev/Prime-OS"
 # The launcher files are fetched from this exact commit, never from the moving
 # "main" branch, so the SHA-256 values below always describe what arrives.
-PINNED_COMMIT="082d90706268760914c47ec5f7aebfde0b965840"
+PINNED_COMMIT="76b1acff08b610fc73a69d1a625309933fc590b6"
 APP_DIR="${PRIME_OS_HOME:-$HOME/Library/Application Support/prime-os}"
 
-LOADER_SHA256="2f5241baea3551ab671aebaf64e7fe1d9988020981a26ef46c4505a683ba1e08"
+LOADER_SHA256="7c75272073714880e8a9afca250b782de3136259ddfc7341ecca3186a1a03ca5"
 ART_SHA256="870972d63acc13b13eb2ffe44420c7e01a8366064e1ebf7ac7a6d6859ca22a36"
 LOGO_SHA256="7a2650c3a71e26e70def9e841bb3105756b246c9fbcce64de719f0b1642fd472e"
 REQUIREMENTS_SHA256="b4506838c7be3c862ac0da2886cdf9dc7dc056f8c25edf5d47038803ac21ae9a"
