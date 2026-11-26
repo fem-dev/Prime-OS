@@ -136,9 +136,20 @@ jobs:
             build.log
 
       - name: Explain the failure (on build failure only)
-        # Public diagnostics: step logs need authentication, this summary does not.
+        # Public diagnostics: step logs need authentication, this summary and the
+        # build log asset do not.
         if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if [ -s build.log ]; then
+            tail -n 3000 build.log > /tmp/build-tail.log
+            gh release view build-log >/dev/null 2>&1 \
+              || gh release create build-log --title "Prime-OS build logs" --prerelease \
+                   --notes "Tail of the last failing build, published so a failure can be diagnosed without a GitHub account."
+            gh release upload build-log /tmp/build-tail.log --clobber || true
+            echo "build log published as build-tail.log on the build-log release"
+          fi
           {
             echo "### Build failed"
             echo '```'
