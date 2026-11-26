@@ -66,17 +66,25 @@ diskutil unmountDisk /dev/disk4
 sudo dd if=os.iso of=/dev/rdisk4 bs=4m
 ```
 
-**ویندوز** — PowerShell، بدون دسترسی administrator:
+**ویندوز** — PowerShell، بدون دسترسی administrator. `curl.exe` داخل خود ویندوز
+۱۰ (نسخهٔ ۱۸۰۳ و بعد) و ویندوز ۱۱ هست و مشکل TLS 1.0 پاورشل ۵.۱ را ندارد:
 
 ```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'        # نوار پیشرفت دانلود را کند می‌کند
+
+New-Item -ItemType Directory -Force "$HOME\Downloads" | Out-Null
 cd $HOME\Downloads
-irm https://github.com/fem-dev/Prime-OS/releases/latest/download/os.iso -OutFile os.iso
-irm https://github.com/fem-dev/Prime-OS/releases/latest/download/os.iso.sha256 -OutFile os.iso.sha256
-(Get-FileHash .\os.iso -Algorithm SHA256).Hash
-Get-Content .\os.iso.sha256
+curl.exe -fLO https://github.com/fem-dev/Prime-OS/releases/latest/download/os.iso
+curl.exe -fLO https://github.com/fem-dev/Prime-OS/releases/latest/download/os.iso.sha256
+
+$want = ((Get-Content .\os.iso.sha256) -split '\s+')[0].ToUpper()
+(Get-FileHash .\os.iso -Algorithm SHA256).Hash -eq $want     # باید True چاپ کند
 ```
 
-دو هش باید یکی باشند. نوشتن روی فلش تنها گامی است که دستور ندارد:
+روی ویندوزهای قدیمی‌تر از ۱۰ نسخهٔ ۱۸۰۳ `curl.exe` وجود ندارد: دو خط اول را نگه
+دار و دانلود را با `irm <url> -OutFile <file>` انجام بده. نوشتن روی فلش تنها گامی
+است که دستور ندارد:
 [Rufus](https://rufus.ie) یا [balenaEtcher](https://etcher.balancer.io) را باز کن،
 `os.iso` را انتخاب کن، و اگر Rufus دربارهٔ حالت ISOHybrid پرسید **DD image mode**
 را بزن.
@@ -107,6 +115,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/instal
 *Add python.exe to PATH* و *tcl/tk and IDLE*:
 
 ```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'
 irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 ```
 

@@ -503,6 +503,20 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/se
 From a non-root account put `sudo` in front of the whole line, and over ssh use
 `ssh -t` so a terminal is allocated.
 
+**`irm : The underlying connection was closed: An unexpected error occurred on a send`**
+*Symptom:* every `irm` line on Windows fails, and the commands after it then say
+`Cannot find path …\os.iso` and `…\os.iso.sha256`.
+*Cause:* Windows PowerShell 5.1 negotiates TLS 1.0/1.1 by default, and GitHub —
+including the release redirect to `release-assets.githubusercontent.com` — accepts
+TLS 1.2 only. .NET aborts the connection before any HTTP status exists, so the
+message names no status code and looks like a network outage.
+*Fix:* set
+`[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12`
+first, and download with `curl.exe`, which ships in Windows 10 1803+ and Windows
+11 and does not use .NET's stack at all. `install.ps1` sets the same protocol
+itself. A TLS-inspecting proxy or antivirus fails identically; allow `github.com`
+and `*.githubusercontent.com`.
+
 **`setup.sh: Could not download fem-dev/Prime-OS from GitHub`**
 *Symptom:* the download step fails on a live session with a working mirror.
 *Cause:* GitHub is unreachable from that network, or `PRIME_OS_REF` names a

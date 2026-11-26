@@ -66,17 +66,26 @@ diskutil unmountDisk /dev/disk4
 sudo dd if=os.iso of=/dev/rdisk4 bs=4m
 ```
 
-**Windows** — PowerShell, no administrator rights:
+**Windows** — PowerShell, no administrator rights. `curl.exe` is part of Windows
+10 (1803 and later) and Windows 11, and it does not inherit PowerShell 5.1's TLS
+1.0 problem:
 
 ```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'        # the progress bar makes downloads crawl
+
+New-Item -ItemType Directory -Force "$HOME\Downloads" | Out-Null
 cd $HOME\Downloads
-irm https://github.com/fem-dev/Prime-OS/releases/latest/download/os.iso -OutFile os.iso
-irm https://github.com/fem-dev/Prime-OS/releases/latest/download/os.iso.sha256 -OutFile os.iso.sha256
-(Get-FileHash .\os.iso -Algorithm SHA256).Hash
-Get-Content .\os.iso.sha256
+curl.exe -fLO https://github.com/fem-dev/Prime-OS/releases/latest/download/os.iso
+curl.exe -fLO https://github.com/fem-dev/Prime-OS/releases/latest/download/os.iso.sha256
+
+$want = ((Get-Content .\os.iso.sha256) -split '\s+')[0].ToUpper()
+(Get-FileHash .\os.iso -Algorithm SHA256).Hash -eq $want     # prints True
 ```
 
-The two hashes must match. Writing the stick is the only step without a command:
+On Windows older than 10 1803 there is no `curl.exe`: keep the first two lines
+and download with `irm <url> -OutFile <file>` instead. Writing the stick is the
+only step without a command:
 open [Rufus](https://rufus.ie) or [balenaEtcher](https://etcher.balancer.io),
 select `os.iso`, and if Rufus asks about ISOHybrid mode choose **DD image mode**.
 
@@ -106,6 +115,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/instal
 PATH* and *tcl/tk and IDLE*:
 
 ```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'
 irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 ```
 

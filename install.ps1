@@ -2,6 +2,17 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 $ProgressPreference = 'SilentlyContinue'
 
+# Windows PowerShell 5.1 negotiates TLS 1.0/1.1 by default and GitHub refuses it,
+# so every Invoke-WebRequest below dies with "The underlying connection was
+# closed: An unexpected error occurred on a send." Ask for 1.2 before anything is
+# downloaded; PowerShell 7 and newer .NET already default to it.
+try {
+    [Net.ServicePointManager]::SecurityProtocol =
+        [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+} catch {
+    # An older .NET without Tls12 left as-is: the download below reports it.
+}
+
 # A red line and a vanishing window is useless. Any terminating error that escapes
 # the main try/catch still prints the reason and waits before the host is closed.
 $script:HasFailed = $false
