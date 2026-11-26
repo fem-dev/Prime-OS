@@ -30,8 +30,8 @@ colours defined in [`branding/palette.json`](branding/palette.json).
 6. **Reboot.** The installed machine contains what you chose, and nothing else.
 
 What the image deliberately does *not* contain: a desktop, applications,
-drivers, or a full copy of the system. That is the whole point — 40 components
-chosen by the user beat one 2.4 GiB image that guesses.
+drivers, or a full copy of the system. That is the whole point — the nine
+components you pick beat one image that guesses.
 
 ## Components
 
@@ -53,61 +53,135 @@ those two files — no code change.
 
 ## Install
 
-One line, from an Arch live session — the [Arch ISO](https://archlinux.org/download/)
-or the Prime-OS setup image below:
+There are three ways in, and they are not interchangeable by operating system.
+Pick the row that describes your machine.
+
+| What you want | Your machine | Where |
+| --- | --- | --- |
+| Install Prime-OS on the computer you are sitting at | **Linux**, booted from an Arch live session | [Linux: one line](#linux-one-line) |
+| Install Prime-OS from a USB stick | **Windows, macOS or Linux** | [Any OS: the setup image](#any-os-the-setup-image) |
+| Download the image in a desktop window, then use it yourself | **Windows, macOS or Linux** | [Any OS: the desktop downloader](#any-os-the-desktop-downloader-optional) |
+
+### Linux: one line
+
+**Linux only.** This command downloads the repository, installs the tools the
+wizard uses and starts it. It needs an Arch live session — the
+[official Arch ISO](https://archlinux.org/download/) or a Prime-OS setup image
+booted from USB — and it refuses to run on a normal, installed system, so your
+working machine is never partitioned by accident.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh | sudo bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh)"
 ```
 
-It checks the machine, installs the handful of tools the wizard uses, fetches this
-repository and starts the wizard. Everything after that is a question: the disk
-(you type `ERASE`), the components, the account. From the Prime-OS setup image the
-same command uses the copy already on the image and skips the download.
+A live session logs you in as root, so the line needs no `sudo`; from another
+account, put `sudo` in front of the whole line. Keep it in this shape: do **not**
+run it as `curl … | bash`. The wizard draws full-screen panels and reads the
+keyboard from the console, so a pipe — which replaces the console with the
+script — leaves the wizard without a keyboard, and it says so and stops.
+
+Everything after that is a question: the disk (you type `ERASE`), the components,
+the account. On a Prime-OS setup image the same command uses the copy already on
+the image and skips the download.
+
+`PRIME_OS_REF` selects what to install — any branch, tag or commit. The default
+is `main`:
 
 ```bash
-PRIME_OS_REF=6283bbebd95448b7957a19367f864ff1b6641f54 \
-  curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh | sudo -E bash
+PRIME_OS_REF=main bash -c "$(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh)"
 ```
 
-`PRIME_OS_REF` takes any branch, tag or commit; the default is `main`. The
-installer refuses to run outside a live session, so a working system is never
-partitioned by accident.
+From a normal account the variable has to reach sudo's environment as well:
+`PRIME_OS_REF=main sudo -E bash -c "$(curl …)"`.
 
-### Or boot the setup image
+Wi-Fi is not set up for you: at the live console run `nmtui`, connect, then run
+the command again. This path does not exist on Windows or macOS — those machines
+have no Arch live session and no `pacman`; use the setup image below.
 
-Take `os.iso` from the [latest release](https://github.com/fem-dev/Prime-OS/releases),
-check it against the published `sha256`, write it to a USB stick and boot it:
+### Any OS: the setup image
+
+This is the way in from **Windows, macOS and Linux**. You download one file,
+check it, write it to a USB stick and boot the machine from that stick. The
+wizard on the stick is the same wizard the one-liner starts.
+
+**1. Download.** Take `os.iso` and `os.iso.sha256` from the
+[latest release](https://github.com/fem-dev/Prime-OS/releases).
+
+**2. Check the download** — one command per platform, compare with
+`os.iso.sha256`:
 
 ```bash
+# Linux
 sha256sum -c os.iso.sha256
-sudo dd if=os.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
-On Windows, [Rufus](https://rufus.ie) or [balenaEtcher](https://etcher.balancer.io)
-write the same file. The image is small enough now that a single download works;
-the parts manifest from earlier releases is still understood by the wizard.
-
-### The setup wizard (optional)
-
-The repository also ships a small desktop program that downloads the image,
-verifies it and keeps it somewhere sensible. It never writes a USB stick and
-never partitions anything.
-
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh)
+# macOS
+shasum -a 256 -c os.iso.sha256
 ```
 
 ```powershell
+# Windows (PowerShell)
+(Get-FileHash .\os.iso -Algorithm SHA256).Hash
+Get-Content .\os.iso.sha256
+```
+
+**3. Write it to a USB stick.** This erases the stick, not the computer.
+
+```bash
+# Linux — /dev/sdX is the stick, check it twice with lsblk
+sudo dd if=os.iso of=/dev/sdX bs=4M status=progress oflag=sync
+```
+
+```bash
+# macOS — diskutil list shows the stick, e.g. disk4; write to the rdisk node
+diskutil unmountDisk /dev/disk4
+sudo dd if=os.iso of=/dev/rdisk4 bs=4m
+```
+
+On **Windows**, use [Rufus](https://rufus.ie) or
+[balenaEtcher](https://etcher.balancer.io) and select `os.iso`. If Rufus asks
+about ISOHybrid mode, choose **Write in DD image mode**.
+
+**4. Boot it.** Open the firmware boot menu (usually `F12`, `F11` or `Esc` at
+power-on), pick the stick, and the setup program starts on the first console.
+
+### Any OS: the desktop downloader (optional)
+
+A small window that downloads `os.iso`, verifies its SHA-256 and keeps it in a
+sensible folder. It never writes a USB stick, never repartitions and never
+installs the operating system: after it finishes you still write the stick
+yourself. Skip it if you already have the file.
+
+```bash
+# Linux — needs curl, python3, venv and Tk:
+#   Debian/Ubuntu: sudo apt install curl python3 python3-venv python3-tk
+#   Arch:          sudo pacman -S curl python tk
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh)
+```
+
+```bash
+# macOS — uses install-mac.sh, not install.sh: install.sh needs sha256sum,
+# which macOS does not have. Needs Python 3 from python.org (it includes Tk).
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install-mac.sh)
+```
+
+```powershell
+# Windows — PowerShell 5.1 or later, no administrator rights.
+# Needs Python 3 from python.org with "Add python.exe to PATH" and
+# "tcl/tk and IDLE" enabled during setup.
 irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 ```
 
-It needs Python 3 with Tk, and `curl`. If the window cannot open, download the
-release by hand — that path needs nothing but a browser.
+If a downloader step fails, it says why and leaves a log in
+`%TEMP%\prime-os-install.log` on Windows, printed on screen on Linux and macOS.
+If the window cannot open at all, download the release by hand — that path needs
+nothing but a browser.
 
 ## Build the image yourself
 
-The build needs Arch's `archiso` and root, so it runs in a container:
+The build needs Arch's `archiso` and root, so it runs in a container **on a Linux
+machine with Docker** (not on Windows or macOS directly):
 
 ```bash
 docker run --rm -it --privileged -e PRIME_OS_BUILD_CONTAINER=1 \
@@ -118,7 +192,8 @@ bash build.sh
 ```
 
 `out/os.iso` is the installer. GitHub Actions builds and publishes it on every
-push to `main` ([`.github/workflows/build-iso.yml`](.github/workflows/build-iso.yml)).
+push to `main` ([`.github/workflows/build-iso.yml`](.github/workflows/build-iso.yml)),
+so you do not need a local build to get one.
 
 ## Repository layout
 
@@ -130,9 +205,9 @@ push to `main` ([`.github/workflows/build-iso.yml`](.github/workflows/build-iso.
 | [`components/`](components) | The per-component package lists the user chooses from. |
 | [`profile/`](profile) | The live side of the ISO: `live-packages.list`, autologin, console text. |
 | [`build.sh`](build.sh) | Assembles the ISO with `mkarchiso`. |
-| [`loader.py`](loader.py) | The optional desktop downloader for the image. |
-| [`setup.sh`](setup.sh) | The one-line installer: fetch this repository and run the wizard. |
-| [`install.sh`](install.sh), [`install-mac.sh`](install-mac.sh), [`install.ps1`](install.ps1) | Install the downloader, pinned to a commit. |
+| [`setup.sh`](setup.sh) | The one-line installer for Linux: fetch this repository and run the wizard. |
+| [`install.sh`](install.sh) · [`install-mac.sh`](install-mac.sh) · [`install.ps1`](install.ps1) | The desktop downloader, one per platform, pinned to a commit. |
+| [`loader.py`](loader.py) | The downloader window itself, used by all three scripts. |
 | [`branding/`](branding) | Palette and the written brand rules. No raster assets. |
 | [`DOCS.md`](DOCS.md) | Every known failure, its cause and its fix. |
 
@@ -158,6 +233,7 @@ Root login is locked on installed systems; the account created during setup is i
 - Secure Boot is not configured.
 - Nothing is tested automatically beyond the build: the wizard has no test suite,
   and CI only checks that the ISO was produced and is the right size.
-- The Persian and other translations of this file can lag behind the English one.
+- Only this English file is authoritative. The other `README.*.md` translations
+  describe an older preview and can lag behind.
 
 Licence: MIT. See [`NOTICE.md`](NOTICE.md) for what this project is not.

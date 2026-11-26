@@ -20,7 +20,7 @@
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986cb44ec78e48f748/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 ```
 
 > [!TIP]
@@ -30,11 +30,18 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986
 > 再试一次 —— 部分 VPN、DNS 过滤器和公司网络会封锁 `raw.githubusercontent.com` 和
 > `github.com`。然后在浏览器中打开 `https://github.com` 确认连接正常，再运行一次同样的命令。
 
-### Linux 和 macOS
+### Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh)
 ```
+
+### macOS
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install-mac.sh)
+```
+
 ## 下载源
 
 Prime-OS 只有一个官方下载源：项目的 **GitHub releases**。没有镜像，也没有第三方主机，因此镜像文件

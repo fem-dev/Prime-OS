@@ -488,6 +488,21 @@ installer partitions a disk, so it only runs from an Arch live session.
 `PRIME_OS_ALLOW_NON_ISO=1` exists for disposable test containers only; it is not
 a way to install over a system that is already running.
 
+**`setup.sh: … stdin here is a pipe …`**
+*Symptom:* the one-line installer stops before the wizard draws anything.
+*Cause:* it was run as `curl … | sudo bash`. bash reads the script from that
+pipe, so the wizard's `dialog` screens are left without a keyboard; `setup.sh`
+refuses on purpose rather than starting a partition it cannot finish. A pipe also
+needs `sudo -E` to carry `PRIME_OS_REF` into the wizard.
+*Fix:* run the line without a pipe:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh)"
+```
+
+From a non-root account put `sudo` in front of the whole line, and over ssh use
+`ssh -t` so a terminal is allocated.
+
 **`setup.sh: Could not download fem-dev/Prime-OS from GitHub`**
 *Symptom:* the download step fails on a live session with a working mirror.
 *Cause:* GitHub is unreachable from that network, or `PRIME_OS_REF` names a

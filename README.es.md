@@ -29,7 +29,7 @@ descarga: un 1 % descargado es un 1 % del dibujo.
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986cb44ec78e48f748/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 ```
 
 > [!TIP]
@@ -41,11 +41,18 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986
 > `github.com`. Después abre `https://github.com` en el navegador para confirmar la conexión y
 > ejecuta el comando otra vez.
 
-### Linux y macOS
+### Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh)
 ```
+
+### macOS
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install-mac.sh)
+```
+
 ## Fuente de descarga
 
 Prime-OS tiene exactamente **una** fuente oficial: las **releases de GitHub** del proyecto. No hay

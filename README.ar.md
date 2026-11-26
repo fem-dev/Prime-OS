@@ -27,7 +27,7 @@
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986cb44ec78e48f748/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 ```
 
 > [!TIP]
@@ -38,11 +38,18 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986
 > تحجب `raw.githubusercontent.com` و`github.com`. تأكد بعدها من فتح `https://github.com` في
 > المتصفح، ثم أعد تنفيذ الأمر.
 
-### Linux و macOS
+### Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh)
 ```
+
+### macOS
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install-mac.sh)
+```
+
 ## مصدر التنزيل
 
 لمشروع Prime-OS مصدر رسمي واحد فقط: **GitHub releases**. لا توجد مرآة ولا مضيف طرف ثالث،

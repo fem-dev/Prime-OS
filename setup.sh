@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prime-OS — install with one line:
 #
-#   curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh | sudo bash
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh)"
 #
 # Run it from an Arch live session — the official archiso image, or the Prime-OS
 # setup image. It installs the few tools the wizard needs, fetches this
@@ -49,18 +49,32 @@ cleanup() {
 trap cleanup EXIT
 
 # === checks =================================================================
-[[ "${EUID}" -eq 0 ]] || die "Run this as root: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/setup.sh | sudo bash"
+[[ "${EUID}" -eq 0 ]] || die "Run this as root, putting sudo in front of the whole line:
+
+  sudo bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/${REPO}/main/setup.sh)\""
 command -v curl >/dev/null 2>&1 || die "curl is missing from this live session; install it with: pacman -Sy curl"
 command -v pacman >/dev/null 2>&1 || die "This is not an Arch system: pacman was not found."
 
 [[ -r /etc/arch-release ]] || die "Prime-OS is installed from an Arch live session (the Arch ISO, or the Prime-OS setup image), not from another distribution."
-[[ -d /run/archiso ]] || die "This is not a live session.
+[[ -d /run/archiso ]] || [[ "${PRIME_OS_ALLOW_NON_ISO:-0}" == 1 ]] || die "This is not a live session.
 
 Boot the Arch ISO or the Prime-OS setup image, then run this command again.
 Refusing to partition the disk of a running system."
 
-if [[ ! -t 0 || ! -t 1 ]]; then
-    die "The setup wizard is interactive and needs a console.
+if [[ ! -t 0 ]]; then
+    die "The wizard draws full-screen panels and reads the keyboard from the
+console, but stdin here is a pipe — that is what 'curl … | bash' does: bash
+reads the script from stdin and the wizard is left without a keyboard.
+
+Run the line without a pipe:
+
+  bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/${REPO}/main/setup.sh)\"
+
+Over ssh, add -t so the terminal is allocated: ssh -t user@host '…'."
+fi
+
+if [[ ! -t 1 ]]; then
+    die "The setup wizard needs a console on stdout.
 
 Run this command on the machine itself (its first console), or over ssh -t."
 fi

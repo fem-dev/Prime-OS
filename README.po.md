@@ -20,7 +20,7 @@
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986cb44ec78e48f748/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 ```
 
 > [!TIP]
@@ -31,11 +31,18 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986
 > de DNS e redes corporativas bloqueiam `raw.githubusercontent.com` e `github.com`. Depois abra
 > `https://github.com` no navegador para confirmar a conexão e execute o comando outra vez.
 
-### Linux e macOS
+### Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh)
 ```
+
+### macOS
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install-mac.sh)
+```
+
 ## Fonte de download
 
 O Prime-OS tem exatamente **uma** fonte oficial: as **releases do GitHub** do projeto. Não há espelho

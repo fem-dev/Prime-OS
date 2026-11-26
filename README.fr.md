@@ -20,7 +20,7 @@ Vous n'avez **pas besoin** de Linux, Docker ou aucune étape de build. Le wizard
 ### Windows
 
 ```powershell
-irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986cb44ec78e48f748/install.ps1 | iex
+irm https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.ps1 | iex
 ```
 
 > [!TIP]
@@ -32,11 +32,18 @@ irm https://raw.githubusercontent.com/fem-dev/Prime-OS/bcfda5806544b362ac89c6986
 > `github.com`. Vérifiez ensuite que `https://github.com` s'ouvre dans le navigateur, puis relancez
 > la commande.
 
-### Linux et macOS
+### Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install.sh)
 ```
+
+### macOS
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/install-mac.sh)
+```
+
 ## Source de téléchargement
 
 Prime-OS n'a qu'**une** source officielle : les **releases GitHub** du projet. Aucun miroir ni tiers,
