@@ -480,6 +480,22 @@ enabled; `installer/lib/apply.sh` uncomments it in the temporary
 run the installer again. A VPN is the usual answer on filtered networks; no
 mirror inside the project is used, by design.
 
+**`setup.sh: This is not a live session`**
+*Symptom:* the one-line installer stops before anything else happens.
+*Cause:* it was run on an installed machine (`/run/archiso` is absent). The
+installer partitions a disk, so it only runs from an Arch live session.
+*Fix:* boot the Arch ISO or the Prime-OS setup image and run the command there.
+`PRIME_OS_ALLOW_NON_ISO=1` exists for disposable test containers only; it is not
+a way to install over a system that is already running.
+
+**`setup.sh: Could not download fem-dev/Prime-OS from GitHub`**
+*Symptom:* the download step fails on a live session with a working mirror.
+*Cause:* GitHub is unreachable from that network, or `PRIME_OS_REF` names a
+tag/commit that does not exist.
+*Fix:* check the ref (`PRIME_OS_REF=main` is the default) and retry. If GitHub is
+blocked, the release image path — write `os.iso` to a USB stick — needs no
+GitHub access at install time.
+
 **`The installed system boots to a black screen`**
 *Symptom:* the boot loader menu appears, then nothing.
 *Cause:* no graphics stack for that GPU was installed (no `drivers-*` component),

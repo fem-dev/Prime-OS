@@ -53,7 +53,28 @@ those two files — no code change.
 
 ## Install
 
-### Download a release image
+One line, from an Arch live session — the [Arch ISO](https://archlinux.org/download/)
+or the Prime-OS setup image below:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh | sudo bash
+```
+
+It checks the machine, installs the handful of tools the wizard uses, fetches this
+repository and starts the wizard. Everything after that is a question: the disk
+(you type `ERASE`), the components, the account. From the Prime-OS setup image the
+same command uses the copy already on the image and skips the download.
+
+```bash
+PRIME_OS_REF=6283bbebd95448b7957a19367f864ff1b6641f54 \
+  curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh | sudo -E bash
+```
+
+`PRIME_OS_REF` takes any branch, tag or commit; the default is `main`. The
+installer refuses to run outside a live session, so a working system is never
+partitioned by accident.
+
+### Or boot the setup image
 
 Take `os.iso` from the [latest release](https://github.com/fem-dev/Prime-OS/releases),
 check it against the published `sha256`, write it to a USB stick and boot it:
@@ -110,6 +131,7 @@ push to `main` ([`.github/workflows/build-iso.yml`](.github/workflows/build-iso.
 | [`profile/`](profile) | The live side of the ISO: `live-packages.list`, autologin, console text. |
 | [`build.sh`](build.sh) | Assembles the ISO with `mkarchiso`. |
 | [`loader.py`](loader.py) | The optional desktop downloader for the image. |
+| [`setup.sh`](setup.sh) | The one-line installer: fetch this repository and run the wizard. |
 | [`install.sh`](install.sh), [`install-mac.sh`](install-mac.sh), [`install.ps1`](install.ps1) | Install the downloader, pinned to a commit. |
 | [`branding/`](branding) | Palette and the written brand rules. No raster assets. |
 | [`DOCS.md`](DOCS.md) | Every known failure, its cause and its fix. |

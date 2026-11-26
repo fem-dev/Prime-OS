@@ -29,8 +29,9 @@ if [[ "${EUID}" -ne 0 ]]; then
     exit 1
 fi
 if [[ ! -r /run/archiso/bootmnt ]] && [[ "${PRIME_OS_ALLOW_NON_ISO:-0}" != 1 ]]; then
-    printf 'This installer only runs from the Prime-OS setup ISO.\n' >&2
-    printf 'Set PRIME_OS_ALLOW_NON_ISO=1 only inside a disposable test container.\n' >&2
+    printf 'This installer only runs from an Arch live session.\n' >&2
+    printf 'Boot the Prime-OS setup ISO (or the Arch ISO and run setup.sh),\n' >&2
+    printf 'or set PRIME_OS_ALLOW_NON_ISO=1 inside a disposable test container.\n' >&2
     exit 1
 fi
 for module in common network disk components account apply boot; do

@@ -53,7 +53,27 @@ overlay نشست Prime-OS را روی سیستم جدید می‌گذارد، ب
 
 ## نصب
 
-### دانلود ایمیج
+یک خط، از داخل یک نشست زندهٔ Arch — [ایمیج رسمی Arch](https://archlinux.org/download/)
+یا ایمیج نصب Prime-OS که پایین‌تر آمده:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh | sudo bash
+```
+
+ماشین را بررسی می‌کند، چند ابزاری که ویزارد لازم دارد را نصب می‌کند، همین مخزن را
+می‌گیرد و ویزارد را اجرا می‌کند. بعد از آن همه‌چیز یک پرسش است: دیسک (باید `ERASE`
+را تایپ کنی)، بخش‌ها، حساب کاربری. اگر همین دستور را روی ایمیج نصب Prime-OS اجرا
+کنی، از نسخه‌ای که روی خود ایمیج هست استفاده می‌کند و چیزی دانلود نمی‌کند.
+
+```bash
+PRIME_OS_REF=6283bbebd95448b7957a19367f864ff1b6641f54 \
+  curl -fsSL https://raw.githubusercontent.com/fem-dev/Prime-OS/main/setup.sh | sudo -E bash
+```
+
+`PRIME_OS_REF` هر برنچ، تگ یا کامیتی را می‌پذیرد؛ پیش‌فرض `main` است. نصب‌کننده
+بیرون از نشست زنده اجرا نمی‌شود، پس دیسک یک سیستم کاری به‌اشتباه پاک نمی‌شود.
+
+### یا بوت کردن ایمیج نصب
 
 `os.iso` را از [آخرین نسخه](https://github.com/fem-dev/Prime-OS/releases) بگیر،
 با `sha256` منتشرشده بسنج، روی فلش بنویس و بوت کن:
@@ -109,6 +129,7 @@ bash build.sh
 | [`profile/`](profile) | بخش زندهٔ ایمیج: `live-packages.list`، ورود خودکار، متن کنسول. |
 | [`build.sh`](build.sh) | ایمیج را با `mkarchiso` می‌سازد. |
 | [`loader.py`](loader.py) | دانلودر اختیاری دسکتاپ برای ایمیج. |
+| [`setup.sh`](setup.sh) | نصب‌کنندهٔ یک‌خطی: مخزن را می‌گیرد و ویزارد را اجرا می‌کند. |
 | [`install.sh`](install.sh)، [`install-mac.sh`](install-mac.sh)، [`install.ps1`](install.ps1) | نصب دانلودر، قفل‌شده به یک کامیت. |
 | [`branding/`](branding) | پالت و قواعد نوشتاری برند. بدون فایل تصویری. |
 | [`DOCS.md`](DOCS.md) | هر خطای شناخته‌شده، علتش و راه‌حلش. |
